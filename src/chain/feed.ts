@@ -91,7 +91,8 @@ export class ChainFeed {
     for (const fn of this.updateFns) fn(s);
     // Yeni iniş: önceki bilinen fırtınadan farklı. İlk veride (prev yok) tetiklenmez.
     const storm = next?.lastStorm;
-    if (prev && storm && storm.id !== prev.lastStorm?.id) {
+    // Geçmiş bilgi (historic) hiçbir zaman fırtına değildir; ondan sonra sunucunun bildirdiği iniş yenidir
+    if (prev && storm && !storm.historic && (storm.id !== prev.lastStorm?.id || prev.lastStorm?.historic)) {
       const at = Date.parse(storm.at.replace(/(\.\d{3})\d+/, '$1'));
       const fresh = !Number.isFinite(at) || Date.now() + this.skew - at < STORM_FRESH_MS;
       for (const fn of this.stormFns) fn(storm, fresh);

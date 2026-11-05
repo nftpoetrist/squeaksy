@@ -1,14 +1,16 @@
 import type { SoundDef } from './AudioManager';
-import { rain, thunder, zap } from './synth';
+import { thunder, zap } from './synth';
 
 /**
- * Ses kataloğu. Ortam sesleri telifsizdir: dosya yerine kodla üretilir (src/audio/synth.ts).
+ * Ses kataloğu. Yıldırım sesleri kodla üretilir (src/audio/synth.ts).
+ * Yağmur: kullanıcının verdiği kayıt (public/audio/rain.m4a; kaynak 5a5360c5c4e13.mp3, sessiz uçları
+ * kırpılmış, AAC 96 kbps). Kodla üretilen yağmur ve içindeki cızırtı katmanı kaldırıldı (kullanıcı, 2026-11-05).
+ * Dosya yalnızca oyuncu sesi açınca indirilir. Seviye eski yağmura eşitlendi (ölçülen RMS'e göre).
  * Sakin kalsın diye: yıldırım anında sadece kısa, yumuşak bir piksel "zap", ardından derin gürleme;
  * elektrik cızırtısı bilerek sessiz (src: null).
  */
 export const SOUNDS: SoundDef[] = [
-  { id: 'ambience.rain.light', channel: 'ambience', src: null, synth: (c) => [rain(c, false)], loop: true, volume: 0.24 },
-  { id: 'ambience.rain.heavy', channel: 'ambience', src: null, synth: (c) => [rain(c, true)], loop: true, volume: 0.12 },
+  { id: 'ambience.rain', channel: 'ambience', src: '/audio/rain.m4a', loop: true, seamless: 2, volume: 0.39 },
   { id: 'ambience.wind', channel: 'ambience', src: null, loop: true, volume: 0.5 },
   { id: 'ambience.birds', channel: 'ambience', src: null, loop: true, volume: 0.4 },
   { id: 'sfx.lightning.crack', channel: 'sfx', src: null, synth: (c) => [31, 32, 33].map((s) => zap(c, s)), volume: 0.16 },

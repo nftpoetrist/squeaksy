@@ -9,6 +9,35 @@ export interface SoundDef {
   synth?: (ctx: AudioContext) => AudioBuffer[] | Promise<AudioBuffer[]>;
   loop?: boolean;
   volume?: number;
+  /**
+   * Dosyadan döngü: yüklenince baş/sondaki sessizlik (kodlayıcı boşlukları dahil) kırpılır ve son N saniye
+   * ilk N saniyenin üstüne yumuşakça bindirilir. Böylece dönüş noktasında tık / boşluk / ses düşmesi olmaz.
+   */
+  seamless?: number;
+}
+
+/** Döngüyü dikişsiz yapar: sessiz uçları kırpar, sonu başa eşit güçle (gürültü için) bindirir. */
+function makeSeamless(ctx: BaseAudioContext, src: AudioBuffer, fadeSeconds: number): AudioBuffer {
+  const chans = Array.from({ length: src.numberOfChannels }, (_, c) => src.getChannelData(c));
+  const thr = 0.001; // -60 dB
+  const loud = (i: number) => chans.some((d) => Math.abs(d[i]!) > thr);
+  let s = 0;
+  let e = src.length - 1;
+  while (s < e && !loud(s)) s++;
+  while (e > s && !loud(e)) e--;
+  const len = e - s + 1;
+  const fade = Math.min(Math.floor(fadeSeconds * src.sampleRate), Math.floor(len / 4));
+  if (fade < 32) return src;
+  const out = ctx.createBuffer(src.numberOfChannels, len - fade, src.sampleRate);
+  chans.forEach((d, c) => {
+    const o = out.getChannelData(c);
+    o.set(d.subarray(s + fade, s + len - fade), fade);
+    for (let i = 0; i < fade; i++) {
+      const t = (i / fade) * (Math.PI / 2);
+      o[i] = d[s + i]! * Math.sin(t) + d[s + len - fade + i]! * Math.cos(t);
+    }
+  });
+  return out;
 }
 
 export interface PlayOptions {
@@ -182,7 +211,8 @@ export class AudioManager {
       srcs.map(async (url) => {
         const res = await fetch(url);
         if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
-        return ctx.decodeAudioData(await res.arrayBuffer());
+        const buf = await ctx.decodeAudioData(await res.arrayBuffer());
+        return def.loop && def.seamless ? makeSeamless(ctx, buf, def.seamless) : buf;
       }),
     )
       .then((bufs) => {

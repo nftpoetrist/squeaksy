@@ -27,6 +27,8 @@ export class RainLayer {
   private sNext = 0;
   private splashBatch = new RectBatch();
   private scene: Scene | null = null;
+  /** Şu an ekrana çizilen damla sayısı (ses bununla eşlenir: damla yoksa yağmur sesi de yok) */
+  activeDrops = 0;
 
   build(scene: Scene, maxDrops: number): void {
     this.scene = scene;
@@ -80,6 +82,7 @@ export class RainLayer {
     if (!s) return;
     const slant = f.p.wind * 0.45;
     const active = Math.round(this.n * f.p.rain * f.q);
+    this.activeDrops = active;
     for (let i = 0; i < this.n; i++) {
       if (i >= active) {
         this.dormant[i] = 1;

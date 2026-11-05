@@ -19,6 +19,11 @@ export interface ChainStorm {
   at: string;
   /** Fırtına anında hamsteri koşan oyuncunun alacağı Block Bounty (0 = bu inişte ödül yok) */
   bounty: number;
+  /**
+   * Yalnızca bilgi: sunucu kurulmadan önceki bir iniş (bilgi balonunda "Last landing" + Sepolia bağlantısı için).
+   * Asla fırtına ya da ödül tetiklemez.
+   */
+  historic?: boolean;
 }
 
 export interface ChainLive {

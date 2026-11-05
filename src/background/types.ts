@@ -61,7 +61,7 @@ export interface BackgroundEvents {
   'lightning:strike': LightningStrikeEvent;
   'weather:change': { from: WeatherMode; to: WeatherMode };
   /** Saniyede ~4 kez: ses ambiyansı vb. için */
-  'weather:tick': { mode: WeatherMode; params: Readonly<WeatherParams> };
+  'weather:tick': { mode: WeatherMode; params: Readonly<WeatherParams>; rainDrops: number };
   'quality:change': { level: QualityLevel };
   /** Hamsterin davranış durumu değişti (buton etiketi vb. için) */
   'hamster:state': { state: import('./layers/hamster').HamsterState; running: boolean };

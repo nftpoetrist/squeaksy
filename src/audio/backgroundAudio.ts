@@ -50,12 +50,14 @@ export function bindBackgroundAudio(bus: EventBus<BackgroundEvents>, audio: Audi
     }
   });
 
-  const offTick = bus.on('weather:tick', ({ params }) => {
-    // Bulutlu havada hep çok hafif bir yağmur dokusu; yağmur arttıkça dolgunlaşır
-    // Uyku yağmuru gibi hep yumuşak bir doku: açık havada bile tamamen susmaz, yağmurla dolgunlaşır
-    const light = 0.35 + 0.65 * Math.min(1, params.rain * 1.6 + 0.3 * params.cloudCover);
-    audio.setLoop('ambience.rain.light', Math.min(1, light), 2);
-    audio.setLoop('ambience.rain.heavy', (Math.max(0, params.rain - 0.55) / 0.45) * 0.8, 3);
+  const offTick = bus.on('weather:tick', ({ params, rainDrops }) => {
+    // Yağmur sesi ekrandaki yağmurla birebir (kullanıcı, 2026-11-05):
+    // - ekranda tek damla yoksa ses tamamen durur (karar çizilen damla sayısından)
+    // - yükseklik yağmur yoğunluğuyla: çok damlanın toplam sesi damla sayısının karekökü kadar büyür
+    //   → fırtına (rain 0.8) tam ses, çisenti (0.06) ~%27, azaldıkça aynı oranda kısılır
+    // - tick 0.25 sn; kısa geçiş (0.3 sn) görüntünün gerisinde kalmaz
+    const level = rainDrops > 0 ? Math.sqrt(Math.min(1, params.rain / 0.8)) : 0;
+    audio.setLoop('ambience.rain', level, 0.3);
     // Müzik şimdilik kapalı (kullanıcı isteği): audio.setLoop('music.ambient', 1, 4);
   });
 

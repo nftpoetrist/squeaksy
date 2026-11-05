@@ -985,7 +985,7 @@ export class PixelStormBackground {
     this.tickAcc += realDt;
     if (this.tickAcc >= 0.25) {
       this.tickAcc = 0;
-      this.events.emit('weather:tick', { mode: this.weather.mode, params: this.weather.params });
+      this.events.emit('weather:tick', { mode: this.weather.mode, params: this.weather.params, rainDrops: this.rain.activeDrops });
     }
   }
 }

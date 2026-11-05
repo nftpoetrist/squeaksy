@@ -98,6 +98,8 @@ export class FallbackChainSource implements ChainSource {
   private primaryOk = false;
   /** Sunucu tarafı kurulu değilken (ör. SQL henüz çalıştırılmadı) her yoklamada sorulmaz */
   private skipPrimaryUntil = 0;
+  /** Sunucu henüz bir iniş görmediyse gösterilecek son gerçek iniş (doğrudan API'den, 10 dk önbellek) */
+  private historic: { storm: ChainStorm | null; at: number } | null = null;
 
   constructor(
     private readonly primary: ChainSource,
@@ -110,6 +112,7 @@ export class FallbackChainSource implements ChainSource {
         const live = await this.primary.fetchChainLive();
         if (live && live.statusAt) {
           this.primaryOk = true;
+          if (!live.lastStorm) live.lastStorm = await this.historicStorm();
           return live;
         }
       } catch {
@@ -124,5 +127,18 @@ export class FallbackChainSource implements ChainSource {
 
   claimStormBounty(id: string): Promise<BountyClaim | null> {
     return this.primary.claimStormBounty(id);
+  }
+
+  private async historicStorm(): Promise<ChainStorm | null> {
+    if (this.historic && Date.now() - this.historic.at < 10 * 60_000) return this.historic.storm;
+    let storm: ChainStorm | null = null;
+    try {
+      const l = await this.fallback.fetchChainLive();
+      storm = l?.lastStorm ? { ...l.lastStorm, bounty: 0, historic: true } : null;
+    } catch {
+      /* bilgi satırı sadece görünmez */
+    }
+    this.historic = { storm, at: Date.now() };
+    return storm;
   }
 }
