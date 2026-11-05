@@ -1,7 +1,7 @@
 import { DEFAULT_CONFIG, mergeConfig, type BackgroundConfig, type DeepPartial } from './config';
 import { EventBus } from './events';
 import { CelestialLayer } from './layers/celestial';
-import { BlockCloudLayer } from './layers/blockClouds';
+import { BlockCloudLayer, REAL_CLUSTER, type RealCloudState } from './layers/blockClouds';
 import { LandscapeLayer } from './layers/landscape';
 import { LightningSystem } from './layers/lightning';
 import { HamsterActor, type HamsterMood, type HamsterState } from './layers/hamster';
@@ -82,6 +82,8 @@ export class PixelStormBackground {
   private finaleGap = 0;
   private resetAt = -1;
   private megaFlash = 0;
+  /** Gerçek blok inişi: sıradaki camgöbeği yıldırımların zamanları (saniye) */
+  private realStrikes: number[] = [];
   /** Token sayacının sahnedeki (CSS piksel) konumu */
   private tokenTarget = { x: 0, y: 0 };
   private readonly rain = new RainLayer();
@@ -503,6 +505,49 @@ export class PixelStormBackground {
     this.resetAt = -1;
   }
 
+  // ------------------------------------------------ Squeekchain Live (Gerçek Bulut)
+
+  /** Gerçek Bulut'un canlı durumu: gerçek bloğun doluluğu, bekleyen iniş, veri tazeliği, gerçek çark */
+  setRealChain(s: RealCloudState): void {
+    this.blocks.setReal(s);
+  }
+
+  /**
+   * Gerçek bloklar zincire indi: Gerçek Bulut'a camgöbeği yıldırım(lar) düşer (blok sayısıyla 1-4),
+   * bulut bir an dolu parlar ve zincirden çark bulutuna enerji akar. Herkesin ekranında aynı an.
+   */
+  realStorm(blocks: number): void {
+    const n = clamp(1 + Math.floor(blocks / 12), 1, 4);
+    this.realStrikes = Array.from({ length: n }, (_, i) => i * 0.22);
+    this.blocks.burstReal();
+    this.hamster.boost();
+  }
+
+  /** Block Bounty: yıldızlar Gerçek Bulut'tan sayaca uçar (her biri bir yıldız) */
+  spillRealCoins(n: number): void {
+    const p = this.blocks.cloudCenter(REAL_CLUSTER);
+    const count = Math.max(0, Math.min(150, Math.floor(n)));
+    for (let k = 0; k < count; k++) this.flights.launch(p.x + (Math.random() - 0.5) * 14, p.y + (Math.random() - 0.5) * 6, 0.1 + k * 0.045, true);
+  }
+
+  /**
+   * Hamster koşmuyorken (ya da misafirken) Block Bounty yıldızları: buluttan dökülüp yere düşer ve söner.
+   * Sayaca uçmaz, hiçbir yere kaydedilmez (yalnızca görsel).
+   */
+  dropRealStars(n: number): void {
+    const p = this.blocks.cloudCenter(REAL_CLUSTER);
+    const count = Math.max(0, Math.min(60, Math.floor(n)));
+    for (let k = 0; k < count; k += 6) this.tokens.spill(p.x, p.y, Math.min(6, count - k));
+  }
+
+  /** Gerçek Bulut'un sahne kutusuna (#world) göre CSS piksel kutusu: etiket ve bilgi düğmesi için */
+  getRealCloudInStage(): { x: number; y: number; w: number; h: number } | null {
+    const b = this.blocks.realBox();
+    if (!b) return null;
+    const k = this.scale;
+    return { x: (b.x - MARGIN) * k, y: (b.y - MARGIN) * k, w: b.w * k, h: b.h * k };
+  }
+
   /** Çarka bağlı bulut kümesinin indeksi: strikeBlock({ cluster }) için */
   get wheelCluster(): number {
     return this.blocks.wheelCluster;
@@ -803,7 +848,8 @@ export class PixelStormBackground {
     if (f.flash > 0.01) {
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = Math.min(1, f.flash);
-      ctx.fillStyle = this.lightning.flashPurple ? '#7a5ad0' : '#6f8fd8';
+      const tint = this.lightning.flashTint;
+      ctx.fillStyle = tint === 'chain' ? '#3a9cc0' : tint === 'purple' ? '#7a5ad0' : '#6f8fd8';
       ctx.fillRect(0, 0, s.W, s.H);
       ctx.globalCompositeOperation = 'source-over';
     }
@@ -825,6 +871,14 @@ export class PixelStormBackground {
   /** Hamster koştukça zinciri doldurur, blok başına token uçurur; tüm bulutlar dolunca finali yürütür. */
   private updateChain(dt: number, f: Frame): void {
     this.megaFlash = Math.max(0, this.megaFlash - dt * 1.4);
+    // Gerçek blok inişinin yıldırımları (oyuncunun zincirinden bağımsız; final ile çakışsa da olur)
+    if (this.realStrikes.length) {
+      this.realStrikes = this.realStrikes.map((t) => t - dt);
+      while (this.realStrikes.length && this.realStrikes[0]! <= 0) {
+        this.realStrikes.shift();
+        this.lightning.strike('super', this.cfg.lightning, f.q, this.reduced, false, { cluster: REAL_CLUSTER, tint: 'chain' });
+      }
+    }
     if (this.resetAt >= 0) {
       this.resetAt -= dt;
       if (this.resetAt < 0) {

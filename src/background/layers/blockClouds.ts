@@ -2,7 +2,7 @@ import { offX, offY, type Frame, type Scene } from '../scene';
 import { hex } from '../util/color';
 import { clamp, lerp, TAU } from '../util/math';
 import { createCanvas, drawCentered, glowSprite, plotLine, RectBatch } from '../util/pixel';
-import { rand, randInt, type Rng } from '../util/rng';
+import { mulberry32, rand, randInt, type Rng } from '../util/rng';
 
 interface TilePalette {
   top: string;
@@ -36,8 +36,29 @@ const THEME_CHAIN = [
   { A: '#9fe9ff', B: '#a996ff', Hi: '#ffffff', Sh: '#4a4aa8' },
   { A: '#ff6a1e', B: '#c81e2a', Hi: '#ffd23a', Sh: '#4a0610' },
   { A: '#ffffff', B: '#f2d98f', Hi: '#ffffff', Sh: '#6a5aa8' },
+  // 4: Squeekchain (Gerçek Bulut'un zinciri). Oyuncu temaları 0..3 kullanır, bu dizin onlara hiç verilmez.
+  { A: '#7ee2f8', B: '#3fb8e0', Hi: '#e8fcff', Sh: '#0c3a5a' },
 ];
-const THEME_GLOW = ['#ffc04a', '#8fe0ff', '#ff5a1a', '#fff3c4'];
+const THEME_GLOW = ['#ffc04a', '#8fe0ff', '#ff5a1a', '#fff3c4', '#4ee6ff'];
+/** Gerçek Bulut (Squeekchain): gerçek hamsterin bloklarıyla dolan camgöbeği bulut */
+const CHAIN_THEME = 4;
+const REAL_FILL: TilePalette = { top: '#c8f8ff', topHi: '#ffffff', hi: '#a8f0ff', base: '#3fc8e8', sh: '#2a9cc8', side: '#1f78a8', deep: '#0c3a5a' };
+/** Boşken de kimliği belli olsun: hafif camgöbeği tonlu boş yuvalar */
+const REAL_EMPTY: TilePalette = { top: '#2f5878', topHi: '#43779a', hi: '#355f80', base: '#112840', sh: '#1a3a56', side: '#0f233a', deep: '#081624' };
+/** Gerçek Bulut'un küme indeksi (oyuncu zincirindeki kümeler 0..n-1) */
+export const REAL_CLUSTER = -2;
+
+/** Gerçek Bulut'un görünen durumu (canlı veriden) */
+export interface RealCloudState {
+  /** 0..1: inşa edilen gerçek bloğun dolma oranı */
+  fill: number;
+  /** Bloklar tamamlandı, zincire yazılmayı bekliyor: bulut dolu ve çıtırdıyor */
+  pending: boolean;
+  /** Veri taze mi (değilse bulut ve zinciri sönük) */
+  live: boolean;
+  /** Gerçek çark şu an koşuyor mu (zincirde veri paketleri akar) */
+  active: boolean;
+}
 const FLAME = ['#fff3a0', '#ffd23a', '#ff8a2a', '#e0302a', '#7a0a18'];
 /** Yıldırım çarpınca 'lighter' ile üstüne bindirilen elektrik silueti */
 const LIT: TilePalette = { top: '#ffffff', topHi: '#ffffff', hi: '#ffffff', base: '#a8ccff', sh: '#7fa8f0', side: '#6a8ce0', deep: '#4a64c0' };
@@ -141,6 +162,18 @@ export class BlockCloudLayer {
   private ox = 0;
   private oy = 0;
   private t = 0;
+  /** Gerçek Bulut + çark bulutuna bağlanan camgöbeği zinciri */
+  private real: Cluster | null = null;
+  private realFills: HTMLCanvasElement | null = null;
+  private realState: RealCloudState = { fill: 0, pending: false, live: false, active: false };
+  /** Ekranda görünen doluluk (hedefe yumuşakça yaklaşır: blok blok dolar) */
+  private realShown = 0;
+  /** Fırtına anı: bulut bir an tamamen dolu ve parlak görünür (saniye) */
+  private realBurst = 0;
+  private realLinkT = 0;
+  /** Fırtına sonrası zincir boyunca çark bulutuna koşan enerji (0..1, -1 = yok) */
+  private realSurge = -1;
+  private realOnce = false;
 
   build(scene: Scene, rng: Rng, count: number): void {
     const { W, H, u, wheel } = scene;
@@ -161,6 +194,18 @@ export class BlockCloudLayer {
     wc.x = Math.round(clamp(wheel.cx - wc.w / 2 + rand(rng, -6, 6) * u, 6, W - wc.w - 8));
     wc.y = Math.round(clamp(wheel.cy - wheel.R - wc.h - 22 * u, H * 0.07, H * 0.3));
     this.clusters.push(wc);
+
+    // 1b) Gerçek Bulut (Squeekchain): çark bulutunun solunda, alt kenarları hizalı; zincirle ona bağlı.
+    // Oyuncunun zincirine dahil değildir (doluluk, final ve rastgele yıldırımlar onu etkilemez).
+    // Sığması için çark bulutu gerekirse sağa kayar; diğer bulutlar çark bulutuna göre dizildiği için onlar da kayar.
+    // Kendi sabit üreteci: oyuncu bulutlarının şekli (aynı tohumdan gelen sıra) değişmez
+    const real = this.makeCluster(portrait ? 3 : 4, 3, mulberry32(0x5eec), [REAL_EMPTY, REAL_FILL]);
+    const linkGap = Math.max(10, Math.round(12 * u));
+    real.x = 6;
+    wc.x = Math.round(Math.min(Math.max(wc.x, real.x + real.w + linkGap), W - wc.w - 8));
+    real.y = Math.round(clamp(wc.y + wc.h - real.h - 2 * u, H * 0.04, H * 0.3));
+    this.real = real;
+    this.realFills = real.fills[0] ?? null;
 
     // 2) Diğer kümeler: gökyüzünde yumuşak bir dalga boyunca, eşit aralıklı bir gerdanlık gibi
     const others = n - 1;
@@ -290,6 +335,30 @@ export class BlockCloudLayer {
     this.theme = THEME_INDEX[theme];
   }
 
+  /** Gerçek Bulut'un canlı durumu. İlk çağrıda doluluk anında yerine oturur, sonra blok blok ilerler. */
+  setReal(s: RealCloudState): void {
+    this.realState = { fill: clamp(s.fill, 0, 1), pending: s.pending, live: s.live, active: s.active };
+    if (!this.realOnce) {
+      this.realOnce = true;
+      this.realShown = s.pending ? 1 : this.realState.fill;
+    }
+  }
+
+  /** Gerçek bloklar indi: bulut bir an dolu parlar, sonra yeni bloğun doluluğuna döner; zincirden enerji akar */
+  burstReal(): void {
+    this.realBurst = 1.1;
+    this.realShown = 1;
+    this.realSurge = 0;
+    if (this.real) this.real.flash.fill(1);
+  }
+
+  /** Gerçek Bulut'un sahnedeki kutusu (iç piksel, sallanma hariç): etiket yerleşimi için */
+  realBox(): { x: number; y: number; w: number; h: number } | null {
+    const c = this.real;
+    if (!c) return null;
+    return { x: Math.round(c.x + this.ox), y: Math.round(c.y + this.oy), w: c.w - this.d, h: c.h };
+  }
+
   private syncFilled(flash: boolean): void {
     for (const c of this.clusters) {
       const filled = clamp(Math.floor(this.blocks - c.offset + 1e-6), 0, c.tiles.length);
@@ -309,7 +378,7 @@ export class BlockCloudLayer {
 
   /** Bulutun ekrandaki merkezi (iç piksel) */
   cloudCenter(ci: number): { x: number; y: number } {
-    const c = this.clusters[ci];
+    const c = ci === REAL_CLUSTER ? this.real : this.clusters[ci];
     if (!c) return { x: 0, y: 0 };
     const [px, py] = this.screenPos(c);
     return { x: px + (c.w >> 1), y: py + (c.h >> 1) };
@@ -321,7 +390,8 @@ export class BlockCloudLayer {
     this.wheelEnergy = energy;
   }
 
-  private makeCluster(cols: number, rows: number, rng: Rng): Cluster {
+  /** custom: [boş, dolu] paleti (Gerçek Bulut). Verilmezse oyuncu temaları boyanır. */
+  private makeCluster(cols: number, rows: number, rng: Rng, custom?: [TilePalette, TilePalette]): Cluster {
     const s = this.s;
     const d = this.d;
     const occ: boolean[][] = [];
@@ -353,9 +423,9 @@ export class BlockCloudLayer {
       y: 0,
       w,
       h,
-      empty: this.paint(tiles, w, h, EMPTY),
-      emptySun: this.paint(tiles, w, h, EMPTY_SUN),
-      fills: THEME_FILL.map((pal) => this.paint(tiles, w, h, pal)),
+      empty: this.paint(tiles, w, h, custom ? custom[0] : EMPTY),
+      emptySun: custom ? this.paint(tiles, w, h, custom[0]) : this.paint(tiles, w, h, EMPTY_SUN),
+      fills: custom ? [this.paint(tiles, w, h, custom[1])] : THEME_FILL.map((pal) => this.paint(tiles, w, h, pal)),
       tileTheme: new Uint8Array(tiles.length),
       lit: this.paint(tiles, w, h, LIT),
       order,
@@ -419,6 +489,15 @@ export class BlockCloudLayer {
 
   /** Yıldırım için hedef seçer. */
   pickTarget(prefer?: number): BlockTarget | null {
+    // Gerçek Bulut yalnızca açıkça istenince (gerçek blok inişi) hedef olur; rastgele yıldırım ona düşmez
+    if (prefer === REAL_CLUSTER) {
+      const c = this.real;
+      if (!c) return null;
+      const ti = c.targets[Math.floor(Math.random() * c.targets.length)] ?? 0;
+      const tile = c.tiles[ti]!;
+      const [px, py] = this.screenPos(c);
+      return { cluster: REAL_CLUSTER, tile: ti, x: px + tile.x + Math.round((this.s + this.d) / 2), y: py + tile.y - Math.round(this.d / 2) };
+    }
     if (this.clusters.length === 0) return null;
     // Rastgele yıldırımlar çark bulutuna değil diğer kümelere düşer.
     const pool = this.clusters.map((_, i) => i).filter((i) => i !== this.wheelIdx);
@@ -436,7 +515,7 @@ export class BlockCloudLayer {
   }
 
   hit(target: BlockTarget, power: number): void {
-    const c = this.clusters[target.cluster];
+    const c = target.cluster === REAL_CLUSTER ? this.real : this.clusters[target.cluster];
     if (!c) return;
     c.hit = 1;
     c.hitPower = power;
@@ -452,6 +531,7 @@ export class BlockCloudLayer {
   update(dt: number, pulses: boolean): void {
     this.t += dt;
     for (const c of this.clusters) c.hit = Math.max(0, c.hit - dt * (c.hitPower > 1.5 ? 0.9 : 1.4));
+    this.updateReal(dt);
     if (pulses) {
       for (const l of this.links) {
         // Çark kablosu: çark döndükçe paketler hızlanır ve sıklaşır
@@ -469,6 +549,27 @@ export class BlockCloudLayer {
       }
     }
     for (const c of this.clusters) for (let i = 0; i < c.flash.length; i++) c.flash[i] = Math.max(0, c.flash[i]! - dt * 1.5);
+  }
+
+  private updateReal(dt: number): void {
+    const c = this.real;
+    if (!c) return;
+    c.hit = Math.max(0, c.hit - dt * (c.hitPower > 1.5 ? 0.9 : 1.4));
+    for (let i = 0; i < c.flash.length; i++) c.flash[i] = Math.max(0, c.flash[i]! - dt * 1.2);
+    if (this.realBurst > 0) {
+      this.realBurst = Math.max(0, this.realBurst - dt);
+    } else {
+      // Hedefe blok blok yaklaşır (aşağı inişte anında: yeni blok boş başlar)
+      const target = this.realState.pending ? 1 : this.realState.fill;
+      if (target < this.realShown - 1e-4) this.realShown = target;
+      else this.realShown = Math.min(target, this.realShown + dt * 0.35);
+    }
+    if (this.realSurge >= 0) {
+      this.realSurge += dt * 1.25;
+      if (this.realSurge > 1) this.realSurge = -1;
+    }
+    // Gerçek çark koşarken zincirde veri paketleri akar
+    if (this.realState.active && this.realState.live) this.realLinkT = (this.realLinkT + dt * 0.45) % 1.4;
   }
 
   private anchor(i: number, side: 'left' | 'right' | 'bottom'): [number, number] {
@@ -573,6 +674,100 @@ export class BlockCloudLayer {
     }
   }
 
+  /** Gerçek Bulut'un sağ kenarından çark bulutunun sol kenarına sarkık zincir */
+  private realLinkPath(): { pt: (t: number) => [number, number]; len: number } | null {
+    const c = this.real;
+    if (!c || this.wheelIdx < 0) return null;
+    const [rx, ry] = this.screenPos(c);
+    const ax = rx + c.w - this.d - 1;
+    const ay = ry + Math.round(c.h * 0.62);
+    const [bx, by] = this.anchor(this.wheelIdx, 'left');
+    const dist = Math.hypot(bx - ax, by - ay);
+    const sag = Math.max(3, dist * 0.14);
+    return { pt: (t) => [lerp(ax, bx, t), lerp(ay, by, t) + sag * 4 * t * (1 - t)], len: dist + sag };
+  }
+
+  /** Gerçek Bulut: camgöbeği bloklar, inşa edilen bloğun doluluğu kadar (son blok alttan yukarı dolar) */
+  private drawReal(ctx: CanvasRenderingContext2D): void {
+    const c = this.real;
+    const fill = this.realFills;
+    if (!c || !fill) return;
+    const s = this.s;
+    const d = this.d;
+    const [x, y] = this.screenPos(c);
+    const live = this.realState.live;
+    const total = c.tiles.length;
+    const amount = this.realShown * total;
+    const whole = Math.min(total, Math.floor(amount + 1e-6));
+    const full = whole >= total;
+    ctx.globalAlpha = live ? 1 : 0.55;
+    if (!full) ctx.drawImage(c.empty, x, y);
+    if (full) ctx.drawImage(fill, x, y);
+    else {
+      for (let k = 0; k < whole; k++) {
+        const t = c.tiles[c.order[k]!]!;
+        const top = t.top ? d : 0;
+        const rw = s + (t.right ? d : 0);
+        const rh = s + top;
+        ctx.drawImage(fill, t.x, t.y - top, rw, rh, x + t.x, y + t.y - top, rw, rh);
+      }
+      const frac = amount - whole;
+      if (frac > 0.02) {
+        const t = c.tiles[c.order[whole]!]!;
+        const fh = Math.round((s - 1) * frac);
+        if (fh > 0) {
+          const sy = t.y + s - 1 - fh;
+          ctx.drawImage(fill, t.x, sy, s - 1, fh, x + t.x, y + sy, s - 1, fh);
+          this.fillLine.add(x + t.x + 1, y + sy, s - 3, 1);
+          this.fillLine.flush(ctx, '#e8fcff', (0.6 + 0.4 * Math.sin(this.t * 8)) * (live ? 1 : 0.5));
+        }
+      }
+    }
+    // Parıltı: yeni dolan bloklar, dolu bekleyen bulutun nabzı, fırtına anının patlaması
+    const glow = this.glows[CHAIN_THEME];
+    const pending = this.realState.pending && live;
+    if (glow) {
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < total; i++) {
+        const pulse = pending || this.realBurst > 0 ? 0.3 + 0.25 * Math.sin(this.t * 6 + i * 0.9) : 0;
+        const a = Math.max(c.flash[i]!, pulse);
+        if (a < 0.03) continue;
+        const t = c.tiles[i]!;
+        ctx.globalAlpha = Math.min(1, a);
+        drawCentered(ctx, glow, x + t.x + (s >> 1), y + t.y + (s >> 1));
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    ctx.globalAlpha = 1;
+    // Zincire yazılmayı bekleyen dolu bulut: üstünde küçük elektrik çıtırtıları
+    if (pending && Math.sin(this.t * 13) > 0.2) {
+      const t = c.tiles[c.targets[Math.floor(this.t * 7) % c.targets.length] ?? 0]!;
+      let ax = x + t.x + (s >> 1);
+      let ay = y + t.y - 1;
+      for (let i = 0; i < 4; i++) {
+        const nx = clamp(ax + (Math.random() < 0.5 ? -1 : 1) * (1 + Math.round(Math.random())), x, x + c.w - 1);
+        const ny = clamp(ay - Math.round(Math.random() * 2), y - 4, y + c.h - 1);
+        plotLine(ax, ay, nx, ny, (qx, qy) => this.arcs.add(qx, qy));
+        ax = nx;
+        ay = ny;
+      }
+      this.arcs.flush(ctx, '#c8fbff', 0.9);
+    }
+    // Yıldırım isabeti (gerçek blok inişi)
+    if (c.hit > 0.01) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = Math.min(1, c.hit * c.hit);
+      ctx.drawImage(c.lit, x, y);
+      const t = c.tiles[c.hitTile];
+      if (t && this.hitGlow) {
+        ctx.globalAlpha = Math.min(1, c.hit);
+        drawCentered(ctx, this.hitGlow, x + t.x + (s >> 1), y + t.y);
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+    }
+  }
+
   /**
    * Eğri boyunca 3 pikselde bir halka dizer: yüzü görünen oval halka ile
    * yandan görünen halka sırayla gelir; halkalar zincirin yönüne göre döner.
@@ -653,6 +848,16 @@ export class BlockCloudLayer {
         this.packets.add(Math.round(x) - 1, Math.round(y) - 1, 2, 2);
       }
     }
+    // Gerçek Bulut → çark bulutu: camgöbeği zincir (veri gecikmişse renksiz)
+    const rp = this.realLinkPath();
+    if (rp) {
+      this.chainLinks(rp.pt, rp.len, this.realState.live ? 1 : 0, CHAIN_THEME);
+      if (this.realState.active && this.realState.live && this.realLinkT < 1) {
+        const [x, y] = rp.pt(this.realLinkT);
+        packetPts.push([Math.round(x), Math.round(y)]);
+        this.packets.add(Math.round(x) - 1, Math.round(y) - 1, 2, 2);
+      }
+    }
     const sunny = sun > 0.5;
     this.chainShade.flush(ctx, sunny ? '#7a4a3a' : '#2a2260', 0.9);
     this.chainA.flush(ctx, sunny ? '#a89ad0' : '#8f82e0');
@@ -686,6 +891,21 @@ export class BlockCloudLayer {
       ctx.globalAlpha = 1;
     }
     this.packets.flush(ctx, '#fff4c0');
+
+    // --- Gerçek Bulut + fırtına sonrası zincirde koşan enerji
+    this.drawReal(ctx);
+    if (rp && this.realSurge >= 0 && this.glows[CHAIN_THEME]) {
+      ctx.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < 3; k++) {
+        const tt = this.realSurge - k * 0.07;
+        if (tt < 0 || tt > 1) continue;
+        const [x, y] = rp.pt(tt);
+        ctx.globalAlpha = 1 - k * 0.3;
+        drawCentered(ctx, this.glows[CHAIN_THEME]!, Math.round(x), Math.round(y));
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+    }
 
     // --- Blok bulutları
     for (const c of this.clusters) {

@@ -49,6 +49,11 @@ export class TokenLedger {
     return this.player !== null;
   }
 
+  /** Giriş yapmış oyuncunun kimliği (misafirde null) */
+  get playerId(): string | null {
+    return this.player?.id ?? null;
+  }
+
   /** Bugünkü (UTC) blok tavanı doldu mu */
   get capped(): boolean {
     return Date.now() < this.cappedUntil;
@@ -139,6 +144,24 @@ export class TokenLedger {
       this.timer = 0;
       void this.flush();
     }, ms);
+  }
+
+  /**
+   * Bakiyeyi sunucudan yeniden okur. Önce uçuştaki claim biter: ondan önce başlamış bir claim'in
+   * (daha eski) yanıtı yeni bakiyeyi ezmesin (ör. Block Bounty'den hemen sonra).
+   */
+  async syncBalance(): Promise<void> {
+    const p = this.player;
+    if (!p) return;
+    if (this.inflight) await this.inflight.catch(() => undefined);
+    try {
+      const b = await this.backend.fetchBalance();
+      if (this.player !== p) return;
+      this.balance = b;
+      this.changed();
+    } catch {
+      /* bir sonraki claim yanıtı zaten güncel bakiyeyi getirir */
+    }
   }
 
   /** Satın alma sonrası sunucunun döndürdüğü bakiye */

@@ -18,7 +18,12 @@ export interface StrikeOptions {
   cluster?: number;
   /** Görsel token dökülmesi (0 = yok) */
   coins?: number;
+  /** 'chain': gerçek Squeekchain bloğu (camgöbeği). Rastgele yıldırımlardan ve finalden ayırt edilir. */
+  tint?: 'chain';
 }
+
+/** Yıldırım rengi: mavi (normal), mor (bazı yakınlar + final), camgöbeği (gerçek Squeekchain bloğu) */
+export type BoltTint = 'blue' | 'purple' | 'chain';
 
 interface BoltPath {
   pts: number[];
@@ -35,7 +40,7 @@ interface Bolt {
   oy: number;
   ix: number;
   iy: number;
-  purple: boolean;
+  tint: BoltTint;
   I: number;
 }
 
@@ -107,7 +112,8 @@ const MAX_SPARKS = 600;
 
 export class LightningSystem {
   flash = 0;
-  flashPurple = false;
+  /** En parlak yıldırımın rengi: sahne aydınlanması bu tonda olur */
+  flashTint: BoltTint = 'blue';
   shakeX = 0;
   shakeY = 0;
 
@@ -141,6 +147,7 @@ export class LightningSystem {
 
   private cloudGlowBlue: HTMLCanvasElement | null = null;
   private cloudGlowPurple: HTMLCanvasElement | null = null;
+  private cloudGlowChain: HTMLCanvasElement | null = null;
   private impactGlow: HTMLCanvasElement | null = null;
   private sheetGlow: HTMLCanvasElement | null = null;
 
@@ -155,6 +162,7 @@ export class LightningSystem {
     const u = scene.u;
     this.cloudGlowBlue = glowSprite(42 * u, hex('#6a8cff'), 0.7, 5, 1.3);
     this.cloudGlowPurple = glowSprite(42 * u, hex('#a070ff'), 0.7, 5, 1.3);
+    this.cloudGlowChain = glowSprite(42 * u, hex('#3fd8ff'), 0.75, 5, 1.3);
     this.impactGlow = glowSprite(14 * u, hex('#8fc8ff'), 0.9, 5, 1.4);
     this.sheetGlow = glowSprite(38 * u, hex('#7a8cff'), 0.55, 5, 1.2);
     this.bolts = [];
@@ -206,7 +214,7 @@ export class LightningSystem {
         }
       }
       if (big) paths.push({ pts: walk(x0 + frand(-10, 10) * u, y0, ix + frand(-2, 2), iy, step), depth: 1 });
-      this.pushBolt(kind, paths, x0, y0, ix, iy);
+      this.pushBolt(kind, paths, x0, y0, ix, iy, opts.tint);
 
       const power = big ? 3 : far ? 0.25 : 1;
       this.targets!.hit(target, power, opts.coins ?? 0);
@@ -233,7 +241,7 @@ export class LightningSystem {
     });
   }
 
-  private pushBolt(kind: LightningKind, paths: BoltPath[], ox: number, oy: number, ix: number, iy: number): void {
+  private pushBolt(kind: LightningKind, paths: BoltPath[], ox: number, oy: number, ix: number, iy: number, tint?: 'chain'): void {
     const keys = flickerKeys(kind === 'super');
     this.bolts.push({
       kind,
@@ -245,7 +253,7 @@ export class LightningSystem {
       oy,
       ix,
       iy,
-      purple: kind === 'super' || Math.random() < 0.22,
+      tint: tint ?? (kind === 'super' || Math.random() < 0.22 ? 'purple' : 'blue'),
       I: 1,
     });
   }
@@ -287,7 +295,7 @@ export class LightningSystem {
     }
 
     let flash = 0;
-    let purple = false;
+    let tint: BoltTint = 'blue';
     const strength = cfg.flashStrength * (reduced ? 0.4 : 1);
     for (const b of this.bolts) {
       b.age += dt;
@@ -296,7 +304,7 @@ export class LightningSystem {
       const fl = b.I * w * strength;
       if (fl > flash) {
         flash = fl;
-        purple = b.purple;
+        tint = b.tint;
       }
     }
     this.bolts = this.bolts.filter((b) => b.age < b.life);
@@ -307,7 +315,7 @@ export class LightningSystem {
     }
     this.sheets = this.sheets.filter((sh) => sh.age < sh.life);
     this.flash = Math.min(1, flash);
-    this.flashPurple = purple;
+    this.flashTint = tint;
 
     // Kıvılcım fiziği
     const g = 240 * s.u;
@@ -360,12 +368,13 @@ export class LightningSystem {
 
   private flushBolt(ctx: CanvasRenderingContext2D, b: Bolt): void {
     const I = b.kind === 'far' ? b.I * 0.65 : b.I;
-    const glow = b.purple ? '#b47cff' : '#5ab0ff';
+    const chain = b.tint === 'chain';
+    const glow = chain ? '#3fe0ff' : b.tint === 'purple' ? '#b47cff' : '#5ab0ff';
     ctx.globalCompositeOperation = 'lighter';
-    this.glowA.flush(ctx, glow, (b.kind === 'far' ? 0.25 : 0.42) * I);
+    this.glowA.flush(ctx, glow, (b.kind === 'far' ? 0.25 : chain ? 0.55 : 0.42) * I);
     this.glowB.flush(ctx, glow, 0.25 * I);
     ctx.globalCompositeOperation = 'source-over';
-    this.inner.flush(ctx, '#bfe6ff', I);
+    this.inner.flush(ctx, chain ? '#b8f8ff' : '#bfe6ff', I);
     this.coreC.flush(ctx, '#9fcaff', 0.6 * I);
     this.coreB.flush(ctx, '#cfeaff', 0.85 * I);
     this.core.flush(ctx, '#ffffff', I);
@@ -415,12 +424,12 @@ export class LightningSystem {
 
   /** Ön bulutların üstüne: yıldırımın çıktığı bulutun içten aydınlanması. */
   drawCloudGlow(ctx: CanvasRenderingContext2D): void {
-    if (!this.cloudGlowBlue || !this.cloudGlowPurple) return;
+    if (!this.cloudGlowBlue || !this.cloudGlowPurple || !this.cloudGlowChain) return;
     ctx.globalCompositeOperation = 'lighter';
     for (const b of this.bolts) {
       if (b.kind === 'far' || b.I < 0.02) continue;
       ctx.globalAlpha = Math.min(1, b.I * 0.7);
-      drawCentered(ctx, b.purple ? this.cloudGlowPurple : this.cloudGlowBlue, b.ox, Math.max(b.oy, 6));
+      drawCentered(ctx, b.tint === 'chain' ? this.cloudGlowChain : b.tint === 'purple' ? this.cloudGlowPurple : this.cloudGlowBlue, b.ox, Math.max(b.oy, 6));
     }
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;

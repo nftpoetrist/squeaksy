@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { DAILY_BLOCK_CAP, type ItemSlot } from '../collection/cards';
 import type { AuthBackend, ClaimResult, LeaderKind, LeaderPage, LeaderRow, Player } from './types';
+import { parseBountyClaim, parseChainLive, type BountyClaim, type ChainLive } from '../chain/types';
 
 /** X profil fotoğrafı: '_normal' (48px) yerine 400×400 sürümü */
 function largeAvatar(url: unknown): string | null {
@@ -185,6 +186,21 @@ export class SupabaseBackend implements AuthBackend {
     const { error } = await this.sb.rpc('set_active_hamster', { p_card: cardId });
     if (error) throw new Error(error.message);
     if (this.player) this.player.activeHamster = cardId;
+  }
+
+  /** Squeekchain Live: herkese açık canlı durum (giriş gerekmez). Fonksiyon henüz kurulmadıysa hata fırlatır. */
+  async fetchChainLive(): Promise<ChainLive | null> {
+    const { data, error } = await this.sb.rpc('chain_live');
+    if (error) throw new Error(error.message);
+    return parseChainLive(data);
+  }
+
+  /** Fırtına anında koşan oyuncu Block Bounty'yi ister; sunucu koşuyu kendi kaydından doğrular (misafirde null) */
+  async claimStormBounty(settlementId: string): Promise<BountyClaim | null> {
+    if (!this.player) return null;
+    const { data, error } = await this.sb.rpc('claim_storm_bounty', { p_settlement: settlementId });
+    if (error) throw new Error(error.message);
+    return parseBountyClaim(data);
   }
 
   async claim(blocks: number, bonus: number): Promise<ClaimResult> {

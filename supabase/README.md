@@ -162,3 +162,57 @@ Not: Leaderboard bakiyeye göre sıraladığı için eklenen yıldızlar sırala
 - Panel olmadan (ekran görüntüsü için): `?dev&clean`
 - Leaderboard'u örnek oyuncularla görmek: `?dev&mockUser=deneme#leaderboard`
 - Hamster tasarım önizlemesi: `/hamster.html`
+- Squeekchain Live sahte zincir (Supabase'e dokunmaz): `?dev&chain=active` (diğerleri: `idle`, `fault`, `delayed`, `pending`, `offline`). **G** tuşu = kayıtlı gerçek bir inişi (gerçek Sepolia işlemiyle) tekrar oynatır. Otomatik: `&landAt=4000`. Parametresiz yerel site gerçek Squeekchain verisini gösterir. Ödülü görmek için `&mockUser=deneme` ekle.
+
+---
+
+## 10. Squeekchain Live (Gerçek Bulut) kurulumu
+
+Mimari: [docs/squeekchain-live.md](../docs/squeekchain-live.md). Supabase her 30 sn `api.squeekchain.com`'u kendisi okur
+(pg_cron + pg_net). Hiçbir gizli anahtar yok. Değer (Block Bounty) yalnızca 12 onaylı `BatchSettled` olayından doğar.
+
+### 10.1 Bir kez yapılacaklar
+1. **Database → Extensions**: `pg_cron` ve `pg_net` eklentilerini aç.
+2. **SQL Editor**: `schema.sql` dosyasının tamamını çalıştır (tekrar çalıştırmak güvenli; zamanlayıcı da kurulur).
+3. Doğrula (SQL Editor):
+   ```sql
+   select extname, extversion from pg_extension where extname in ('pg_cron', 'pg_net');
+   select jobname, schedule, active from cron.job where jobname = 'squeaksy-chain-tick';
+   ```
+4. Bir dakika bekle, sonra:
+   ```sql
+   select wheel_status, settled_height, projected_height, status_at, core_at, last_error, consecutive_failures
+   from public.chain_live;
+   select genesis_ts, round_seconds, installation_id, paused_reason from public.chain_config;
+   ```
+   `status_at` ve `core_at` dolu, `last_error` boş olmalı. Sitede bulut "Feed delayed" yerine "Block ..." gösterir.
+
+### 10.2 Ödülleri açmak / kapatmak
+Kurulumda **kapalı** gelir (fırtına görünür, yıldız verilmez). Açmak için:
+```sql
+update public.chain_config set rewards_enabled = true;
+```
+Acil durumda aynı komutu `false` ile çalıştır. Rakamlar: `bounty_per_block` (3), `bounty_min` (25), `bounty_max` (150).
+
+Kural: ödül **yalnızca gerçek blok indiği anda hamsteri koşan** giriş yapmış oyuncuya yazılır. Sunucu kendisi doğrular:
+oyuncu son `running_grace_seconds` (15) içinde `claim_tokens` ile en az bir blok kazanmış olmalı (`profiles.last_run_at`)
+ve istek inişten sonra `claim_window_seconds` (120) içinde gelmeli. Koşmayan oyuncunun ekranında yıldızlar yine dökülür ama
+kaydedilmez. Hiçbir ödül otomatik dağıtılmaz; `claim_storm_bounty()` ile, inişten oyuncu başına bir kez.
+
+### 10.3 İzleme
+```sql
+-- Son kesinleşmeler ve dağıtılan ödüller
+select through_round, kind, completed_blocks, grants_count, grants_total, ingested_at
+from public.chain_settlements order by through_round desc limit 20;
+-- Zamanlayıcının son çalışmaları
+select status, return_message, start_time from cron.job_run_details order by start_time desc limit 10;
+```
+
+### 10.4 Squeekchain yeni sürüme geçerse
+Zincir ayarı (genesis, tur süresi, kurulum kimliği) değişirse ödüller kendiliğinden durur ve `chain_config.paused_reason` dolar.
+Yeni sürümü inceledikten sonra yeniden başlatmak için:
+```sql
+update public.chain_config set genesis_ts = null, round_seconds = null, block_units = null, installation_id = null, paused_reason = null;
+update public.chain_live set settled_through_round = null, settled_cumulative_units = null;
+```
+İlk okumada sadece başlangıç noktası kaydedilir; geçmişe ödül verilmez.

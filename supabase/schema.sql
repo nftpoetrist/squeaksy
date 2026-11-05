@@ -92,6 +92,9 @@ grant select on public.equipped_items to authenticated;
 alter table public.profiles add column if not exists day_start date not null default ((now() at time zone 'utc')::date);
 alter table public.profiles add column if not exists day_blocks integer not null default 0 check (day_blocks >= 0);
 
+-- Son blok kazanılan an (claim_tokens'ta en az bir blok yazıldığında). Block Bounty "koşuyor mu" diye buna bakar.
+alter table public.profiles add column if not exists last_run_at timestamptz;
+
 -- Yarım yıldızlar (ör. ETH Pixsy +0.5): tam yıldız olana kadar burada birikir, kaybolmaz
 alter table public.profiles add column if not exists star_fraction numeric(10, 4) not null default 0;
 
@@ -250,6 +253,8 @@ begin
     day_start = today,
     day_blocks = day_used,
     last_claim_at = now(),
+    -- Squeekchain Live: hamster gerçekten blok kazandıysa "koşuyor" kanıtı (Block Bounty bunu arar)
+    last_run_at = case when cb > 0 then now() else p.last_run_at end,
     updated_at = now()
   where p.id = uid
   returning p.balance into prof.balance;
@@ -483,3 +488,515 @@ as $$
 $$;
 revoke all on function public.leaderboard(text, integer, integer) from public;
 grant execute on function public.leaderboard(text, integer, integer) to anon, authenticated;
+
+-- ================================================================ Squeekchain Live
+-- Gerçek Squeekchain verisi oyuna buradan girer (bkz. docs/squeekchain-live.md).
+-- Veri, Postgres'in içinden okunur (pg_cron + pg_net): hiçbir gizli anahtar yok.
+--   chain_tick() her 30 sn: önceki isteklerin yanıtlarını işler, yenilerini gönderir.
+--   ingest_status(): çark durumu + inşa edilen blok (görsel; optimistic veri olabilir).
+--   ingest_core(): güvenli (12 onaylı) BatchSettled olayları → kesinleşme kaydı + Block Bounty.
+-- Değer (yıldız) yalnızca güvenli kesinleşmiş zincir olayından doğar. Bir kural bozulursa o adımda
+-- hiçbir şey yazılmaz, hata chain_live.last_error'a düşer, oyun etkilenmez.
+-- pg_cron / pg_net kurulu değilse bu bölüm sessizce pasif kalır.
+
+-- Ayarlar (tek satır, sadece sunucu). Zincir kimliği ilk okumada doldurulur; değişirse ödüller durur.
+create table if not exists public.chain_config (
+  id smallint primary key default 1 check (id = 1),
+  -- Acil kapatma: false iken veri toplanır, fırtına görünür ama yıldız verilmez
+  rewards_enabled boolean not null default false,
+  api_base text not null default 'https://api.squeekchain.com',
+  expected_chain_id text not null default '11155111',
+  expected_core text not null default '0xfd6c166d4b8e2962e65746a13e5a0797cd4de0c4',
+  installation_id text,
+  genesis_ts bigint,
+  round_seconds integer,
+  block_units bigint,
+  -- Block Bounty: gerçek blok başına yıldız, alt / üst sınır
+  bounty_per_block integer not null default 3 check (bounty_per_block >= 0),
+  bounty_min integer not null default 25 check (bounty_min >= 0),
+  bounty_max integer not null default 150 check (bounty_max >= 0),
+  -- Ödül yalnızca fırtına anında hamsteri koşan oyuncuya: inişten sonra bu kadar saniye içinde istenmeli ve
+  -- oyuncu son running_grace_seconds içinde gerçekten blok kazanmış olmalı (claim_tokens → last_run_at)
+  claim_window_seconds integer not null default 120 check (claim_window_seconds between 30 and 900),
+  running_grace_seconds integer not null default 15 check (running_grace_seconds between 5 and 60),
+  -- Zincir kimliği beklenenden farklı geldiyse sebebi (null = sorun yok)
+  paused_reason text
+);
+insert into public.chain_config (id) values (1) on conflict (id) do nothing;
+alter table public.chain_config enable row level security;
+revoke all on public.chain_config from anon, authenticated;
+
+alter table public.chain_config add column if not exists claim_window_seconds integer not null default 120;
+alter table public.chain_config add column if not exists running_grace_seconds integer not null default 15;
+alter table public.chain_config drop column if exists min_round_blocks;
+
+-- Canlı durum (tek satır). İstemci yalnızca chain_live() fonksiyonuyla okur.
+create table if not exists public.chain_live (
+  id smallint primary key default 1 check (id = 1),
+  wheel_status text not null default 'UNKNOWN',
+  wheel_hardware boolean not null default false,
+  wheel_fresh boolean not null default false,
+  wheel_observed_at timestamptz,
+  projected_height bigint,
+  projected_progress_ppb bigint,
+  -- Güvenli kesinleşmiş zincir başı (ingest_core)
+  settled_height bigint,
+  settled_progress_ppb bigint,
+  settled_through_round bigint,
+  settled_cumulative_units numeric,
+  last_storm_id text,
+  last_storm_blocks integer,
+  last_storm_first bigint,
+  last_storm_last bigint,
+  last_storm_tx text,
+  last_storm_round bigint,
+  last_storm_at timestamptz,
+  last_storm_chain_at timestamptz,
+  -- Bu fırtınada koşan oyuncuya verilecek ödül (0 = ödül yok: kapalı / donanım dışı)
+  last_storm_bounty integer not null default 0,
+  status_at timestamptz,
+  core_at timestamptz,
+  consecutive_failures integer not null default 0,
+  last_error text,
+  last_error_at timestamptz
+);
+insert into public.chain_live (id) values (1) on conflict (id) do nothing;
+alter table public.chain_live enable row level security;
+revoke all on public.chain_live from anon, authenticated;
+
+-- Her BatchSettled olayı (tx_hash:log_index). Aynı olay ikinci kez işlenemez.
+create table if not exists public.chain_settlements (
+  id text primary key,
+  tx_hash text not null check (tx_hash ~ '^0x[0-9a-f]{64}$'),
+  eth_block bigint not null,
+  chain_time timestamptz,
+  prev_round bigint not null,
+  through_round bigint not null,
+  active_rounds integer not null,
+  cumulative_units numeric not null,
+  first_block bigint,
+  last_block bigint,
+  completed_blocks integer not null,
+  -- Koşan oyuncu başına Block Bounty (0 = bu inişte ödül yok)
+  bounty integer not null default 0,
+  -- baseline: ilk okumadaki başlangıç noktası · gap: kesinti sonrası kopuk aralık (ikisinde de ödül yok)
+  kind text not null default 'normal' check (kind in ('normal', 'baseline', 'gap')),
+  grants_count integer not null default 0,
+  grants_total bigint not null default 0,
+  ingested_at timestamptz not null default now()
+);
+alter table public.chain_settlements add column if not exists bounty integer not null default 0;
+alter table public.chain_live add column if not exists last_storm_bounty integer not null default 0;
+alter table public.chain_settlements enable row level security;
+revoke all on public.chain_settlements from anon, authenticated;
+
+-- Block Bounty ödülleri: bir inişten oyuncu başına en fazla bir ödül (birincil anahtar).
+-- Sadece claim_storm_bounty() yazar: fırtına anında hamsteri koşan oyuncu.
+create table if not exists public.storm_grants (
+  settlement_id text not null references public.chain_settlements (id) on delete cascade,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  bounty integer not null check (bounty >= 0),
+  created_at timestamptz not null default now(),
+  primary key (settlement_id, user_id)
+);
+create index if not exists storm_grants_user_idx on public.storm_grants (user_id, created_at desc);
+alter table public.storm_grants enable row level security;
+revoke all on public.storm_grants from anon, authenticated;
+
+-- pg_net istek defteri (yanıt bir sonraki tick'te okunur)
+create table if not exists public.chain_fetch (
+  request_id bigint primary key,
+  kind text not null check (kind in ('status', 'core')),
+  sent_at timestamptz not null default now()
+);
+alter table public.chain_fetch enable row level security;
+revoke all on public.chain_fetch from anon, authenticated;
+
+-- Hata kaydı: art arda hata sayısı artar (başarılı bir okuma sıfırlar)
+create or replace function public.chain_note_error(p_msg text)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.chain_live set
+    consecutive_failures = consecutive_failures + 1,
+    last_error = left(p_msg, 500),
+    last_error_at = now()
+  where id = 1;
+$$;
+
+-- /v1/status yanıtı: çark durumu ve inşa edilen blok. Sadece görsel alanlar; değer üretmez.
+create or replace function public.ingest_status(j jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  cfg public.chain_config;
+  m jsonb := j -> 'measurement';
+  st text;
+  observed timestamptz;
+  stale_after integer;
+  units numeric;
+begin
+  select * into cfg from public.chain_config where id = 1;
+  if cfg.installation_id is not null and j ->> 'installationId' is distinct from cfg.installation_id then
+    raise exception 'status: installation % does not match %', j ->> 'installationId', cfg.installation_id;
+  end if;
+
+  -- Squeekchain şeması: coreStatus ∈ IDLE | ACTIVE | COUNTER_FAULT, freshness ∈ online | stale
+  st := m ->> 'coreStatus';
+  if st is null or st not in ('IDLE', 'ACTIVE', 'COUNTER_FAULT') then
+    st := 'UNKNOWN';
+  end if;
+  observed := (m ->> 'observedAt')::timestamptz;
+  stale_after := least(coalesce((m ->> 'staleAfterSeconds')::integer, 120), 600);
+
+  -- İnşa edilen blok (optimistic: yalnızca bulutun dolum görseli için)
+  if j #>> '{builder,status}' = 'available' and cfg.block_units > 0 then
+    units := (j #>> '{builder,projected,cumulativeBlockUnits}')::numeric;
+  end if;
+
+  update public.chain_live set
+    wheel_status = st,
+    wheel_hardware = coalesce(m ->> 'provenance' = 'hardware', false),
+    wheel_fresh = coalesce(m ->> 'freshness' = 'online' and observed > now() - make_interval(secs => stale_after), false),
+    wheel_observed_at = observed,
+    projected_height = case when units is null then null else floor(units / cfg.block_units)::bigint end,
+    projected_progress_ppb = case when units is null then null
+      else floor(mod(units, cfg.block_units) * 1000000000 / cfg.block_units)::bigint end,
+    status_at = now(),
+    consecutive_failures = 0
+  where id = 1;
+end;
+$$;
+
+-- /v1/core yanıtı: güvenli BatchSettled olaylarını sırayla işler, Block Bounty yazar. Tek işlem, idempotent.
+create or replace function public.ingest_core(j jsonb)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  cfg public.chain_config;
+  live public.chain_live;
+  core_addr text := lower(j #>> '{identities,core}');
+  safe_head bigint := (j #>> '{chain,safeThroughBlock}')::bigint;
+  g bigint := (j #>> '{configuration,genesisTimestamp}')::bigint;
+  rs integer := (j #>> '{configuration,roundDuration}')::integer;
+  upb bigint := (j #>> '{configuration,blockUnitsPerBlock}')::bigint;
+  max_rounds integer := coalesce((j #>> '{configuration,maxRoundsPerBatch}')::integer, 16);
+  ev record;
+  a jsonb;
+  sid text;
+  tx text;
+  prev_r bigint;
+  thru bigint;
+  active integer;
+  cum numeric;
+  prev_h bigint;
+  new_h bigint;
+  done integer;
+  kind text;
+  bounty integer;
+  newest_round bigint;
+begin
+  select * into cfg from public.chain_config where id = 1 for update;
+  select * into live from public.chain_live where id = 1 for update;
+
+  -- 1) Doğru zincir ve doğru kontrat mı
+  if j #>> '{chain,chainId}' is distinct from cfg.expected_chain_id then
+    raise exception 'core: chainId % (expected %)', j #>> '{chain,chainId}', cfg.expected_chain_id;
+  end if;
+  if core_addr is distinct from lower(cfg.expected_core) then
+    raise exception 'core: core address % (expected %)', core_addr, cfg.expected_core;
+  end if;
+  if g is null or rs is null or rs <= 0 or upb is null or upb <= 0 or safe_head is null then
+    raise exception 'core: missing configuration';
+  end if;
+
+  -- 2) Zincir ayarı: ilk okumada kaydedilir; sonradan değişirse (yeni sürüm) ödüller durur
+  if cfg.genesis_ts is null then
+    update public.chain_config set installation_id = j ->> 'installationId', genesis_ts = g, round_seconds = rs, block_units = upb
+    where id = 1;
+    cfg.genesis_ts := g;
+    cfg.round_seconds := rs;
+    cfg.block_units := upb;
+  elsif cfg.genesis_ts <> g or cfg.round_seconds <> rs or cfg.block_units <> upb
+     or cfg.installation_id is distinct from j ->> 'installationId' then
+    -- Hata fırlatılmaz (yoksa bu kayıt da geri alınırdı): durdurma sebebi yazılır, hiçbir olay işlenmez.
+    -- Yeni sürümü elle onaylamak için: genesis_ts/round_seconds/block_units/installation_id/paused_reason null yapılır.
+    update public.chain_config set paused_reason = 'chain configuration changed: ' || coalesce(j ->> 'installationId', '?')
+    where id = 1;
+    update public.chain_live set core_at = now(), last_error = 'chain configuration changed, rewards paused', last_error_at = now()
+    where id = 1;
+    return;
+  end if;
+
+  -- 3) Güvenli olaylar, tur sırasıyla
+  select max(((select x ->> 'value' from jsonb_array_elements(e -> 'arguments') x where x ->> 'name' = 'settledThroughRound'))::bigint)
+  into newest_round
+  from jsonb_array_elements(coalesce(j -> 'events', '[]'::jsonb)) as e
+  where e ->> 'eventName' = 'BatchSettled'
+    and lower(e ->> 'contractAddress') = core_addr
+    and (e ->> 'blockNumber')::bigint <= safe_head;
+
+  for ev in
+    select e
+    from jsonb_array_elements(coalesce(j -> 'events', '[]'::jsonb)) as e
+    where e ->> 'eventName' = 'BatchSettled'
+      and lower(e ->> 'contractAddress') = core_addr
+      and (e ->> 'blockNumber')::bigint <= safe_head
+    order by ((select x ->> 'value' from jsonb_array_elements(e -> 'arguments') x where x ->> 'name' = 'settledThroughRound'))::bigint
+  loop
+    select jsonb_object_agg(x ->> 'name', x ->> 'value') into a from jsonb_array_elements(ev.e -> 'arguments') x;
+    tx := lower(ev.e ->> 'transactionHash');
+    if tx !~ '^0x[0-9a-f]{64}$' then
+      raise exception 'core: bad transaction hash %', tx;
+    end if;
+    sid := tx || ':' || (ev.e ->> 'logIndex');
+    thru := (a ->> 'settledThroughRound')::bigint;
+    prev_r := (a ->> 'previousSettledThroughRound')::bigint;
+    active := (a ->> 'activeRoundCount')::integer;
+    cum := (a ->> 'cumulativeBlockUnits')::numeric;
+    if thru is null or prev_r is null or active is null or cum is null or thru <= prev_r or active < 0
+       or active > thru - prev_r or thru - prev_r > max_rounds then
+      raise exception 'core: malformed BatchSettled %', sid;
+    end if;
+
+    -- Zaten işlenmiş (ya da başlangıç noktasından eski) olay
+    continue when live.settled_through_round is not null and thru <= live.settled_through_round;
+    -- İlk okumada sadece en son güvenli olay başlangıç noktası olur (eski olaylar yeniden fırtına çıkarmaz)
+    continue when live.settled_through_round is null and thru < newest_round;
+
+    new_h := floor(cum / upb)::bigint;
+    if live.settled_through_round is null then
+      -- İlk okuma: geçmişe ödül verilmez, sadece başlangıç noktası
+      kind := 'baseline';
+      done := 0;
+    elsif prev_r <> live.settled_through_round then
+      -- Kesinti: aradaki olaylar artık görünmüyor; kopuk aralığa ödül verilmez
+      kind := 'gap';
+      done := 0;
+    else
+      kind := 'normal';
+      if cum < live.settled_cumulative_units then
+        raise exception 'core: cumulative block units went backwards at %', sid;
+      end if;
+      prev_h := floor(live.settled_cumulative_units / upb)::bigint;
+      done := (new_h - prev_h)::integer;
+      if done > max_rounds * 1000 then
+        raise exception 'core: implausible block count % at %', done, sid;
+      end if;
+    end if;
+
+    -- Block Bounty tutarı: gerçek blok tamamlandıysa ve ödüller açıksa. Kimseye otomatik yazılmaz;
+    -- fırtına anında hamsteri koşan oyuncu claim_storm_bounty() ile alır.
+    bounty := 0;
+    if kind = 'normal' and done > 0 and active > 0 and cfg.rewards_enabled and cfg.paused_reason is null
+       and live.wheel_hardware then
+      bounty := least(cfg.bounty_max, greatest(cfg.bounty_min, done * cfg.bounty_per_block));
+    end if;
+
+    insert into public.chain_settlements (id, tx_hash, eth_block, chain_time, prev_round, through_round, active_rounds,
+      cumulative_units, first_block, last_block, completed_blocks, kind, bounty)
+    values (sid, tx, (ev.e ->> 'blockNumber')::bigint, to_timestamp((ev.e ->> 'blockTimestamp')::bigint), prev_r, thru, active,
+      cum, case when done > 0 then new_h - done + 1 end, case when done > 0 then new_h end, done, kind, bounty)
+    on conflict (id) do nothing;
+    if not found then
+      continue;
+    end if;
+
+    live.settled_through_round := thru;
+    live.settled_cumulative_units := cum;
+    update public.chain_live set
+      settled_through_round = thru,
+      settled_cumulative_units = cum,
+      settled_height = new_h,
+      settled_progress_ppb = floor(mod(cum, upb) * 1000000000 / upb)::bigint
+    where id = 1;
+    -- Herkesin ekranındaki fırtına: gerçek blok tamamlanan her güvenli kesinleşme
+    if kind = 'normal' and done > 0 then
+      update public.chain_live set
+        last_storm_id = sid,
+        last_storm_blocks = done,
+        last_storm_first = new_h - done + 1,
+        last_storm_last = new_h,
+        last_storm_tx = tx,
+        last_storm_round = thru,
+        last_storm_at = now(),
+        last_storm_chain_at = to_timestamp((ev.e ->> 'blockTimestamp')::bigint),
+        last_storm_bounty = bounty
+      where id = 1;
+    end if;
+  end loop;
+
+  update public.chain_live set core_at = now(), consecutive_failures = 0 where id = 1;
+end;
+$$;
+
+-- Zamanlayıcının çağırdığı adım: önceki yanıtları işler, yeni istekleri gönderir, eski kayıtları temizler.
+-- pg_net istekleri ancak bu işlem bittikten sonra gönderir; yanıt bir sonraki adımda okunur.
+create or replace function public.chain_tick()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  f record;
+  resp record;
+  cfg public.chain_config;
+begin
+  if to_regclass('net._http_response') is null then
+    return;
+  end if;
+  select * into cfg from public.chain_config where id = 1;
+
+  for f in select * from public.chain_fetch order by sent_at loop
+    select r.status_code, r.content, r.timed_out, r.error_msg into resp
+    from net._http_response r where r.id = f.request_id;
+    if not found then
+      -- Yanıt henüz gelmedi; 3 dakikadan eskiyse vazgeç
+      if f.sent_at < now() - interval '3 minutes' then
+        delete from public.chain_fetch where request_id = f.request_id;
+        perform public.chain_note_error(f.kind || ': no response');
+      end if;
+      continue;
+    end if;
+    delete from public.chain_fetch where request_id = f.request_id;
+    begin
+      if resp.status_code = 200 and resp.content is not null then
+        if f.kind = 'status' then
+          perform public.ingest_status(resp.content::jsonb);
+        else
+          perform public.ingest_core(resp.content::jsonb);
+        end if;
+      else
+        perform public.chain_note_error(f.kind || ': http ' || coalesce(resp.status_code::text, 'none')
+          || coalesce(' ' || resp.error_msg, '') || case when resp.timed_out then ' (timeout)' else '' end);
+      end if;
+    exception when others then
+      -- ingest_* içindeki her şey geri alınır (yarım kayıt kalmaz); sadece hata not edilir
+      perform public.chain_note_error(sqlerrm);
+    end;
+  end loop;
+
+  -- Yeni istekler (aynı türden bekleyen yoksa)
+  if not exists (select 1 from public.chain_fetch where kind = 'status') then
+    insert into public.chain_fetch (request_id, kind)
+    values (net.http_get(url := cfg.api_base || '/v1/status',
+      headers := '{"accept": "application/json", "user-agent": "Squeaksy/1.0 (+https://squeaksy.xyz)"}'::jsonb,
+      timeout_milliseconds := 8000), 'status');
+  end if;
+  if not exists (select 1 from public.chain_fetch where kind = 'core') then
+    insert into public.chain_fetch (request_id, kind)
+    values (net.http_get(url := cfg.api_base || '/v1/core',
+      headers := '{"accept": "application/json", "user-agent": "Squeaksy/1.0 (+https://squeaksy.xyz)"}'::jsonb,
+      timeout_milliseconds := 8000), 'core');
+  end if;
+end;
+$$;
+
+-- Herkese açık canlı durum (anon dahil). Kimlik ya da iç hata ayrıntısı içermez.
+create or replace function public.chain_live()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select jsonb_build_object(
+    'serverTime', now(),
+    'statusAt', l.status_at,
+    'coreAt', l.core_at,
+    'wheel', jsonb_build_object('status', l.wheel_status, 'hardware', l.wheel_hardware, 'fresh', l.wheel_fresh,
+      'observedAt', l.wheel_observed_at),
+    'build', jsonb_build_object('settledHeight', l.settled_height, 'settledProgressPpb', l.settled_progress_ppb,
+      'projectedHeight', l.projected_height, 'projectedProgressPpb', l.projected_progress_ppb),
+    'lastStorm', case when l.last_storm_id is null then null else jsonb_build_object('id', l.last_storm_id,
+      'blocks', l.last_storm_blocks, 'first', l.last_storm_first, 'last', l.last_storm_last, 'tx', l.last_storm_tx,
+      'at', l.last_storm_at, 'chainAt', l.last_storm_chain_at, 'bounty', l.last_storm_bounty) end,
+    'bounty', jsonb_build_object('enabled', c.rewards_enabled and c.paused_reason is null, 'perBlock', c.bounty_per_block,
+      'min', c.bounty_min, 'max', c.bounty_max, 'windowSeconds', c.claim_window_seconds)
+  )
+  from public.chain_live l cross join public.chain_config c
+  where l.id = 1 and c.id = 1;
+$$;
+
+-- Block Bounty'yi al: yalnızca fırtına anında hamsteri gerçekten koşan oyuncu.
+-- Kanıt sunucuda: oyuncu son running_grace_seconds içinde claim_tokens ile en az bir blok kazanmış olmalı
+-- (last_run_at) ve iniş claim_window_seconds'tan eski olmamalı. Bir inişten oyuncu başına bir kez.
+-- Dönüş: status = granted | not_running | expired | already | unavailable, bounty, balance
+drop function if exists public.my_storm_grants(timestamptz);
+create or replace function public.claim_storm_bounty(p_settlement text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  uid uuid := auth.uid();
+  cfg public.chain_config;
+  st public.chain_settlements;
+  ran timestamptz;
+  bal bigint;
+begin
+  if uid is null then
+    raise exception 'not authenticated';
+  end if;
+  select * into cfg from public.chain_config where id = 1;
+  select * into st from public.chain_settlements s where s.id = p_settlement;
+  if not found or st.kind <> 'normal' or st.bounty <= 0 or not cfg.rewards_enabled or cfg.paused_reason is not null then
+    return jsonb_build_object('status', 'unavailable', 'bounty', 0);
+  end if;
+  if st.ingested_at < now() - make_interval(secs => cfg.claim_window_seconds) then
+    return jsonb_build_object('status', 'expired', 'bounty', 0);
+  end if;
+
+  -- Profil kilitlenir: aynı anda gelen iki istek sırayla işlenir
+  select p.last_run_at, p.balance into ran, bal from public.profiles p where p.id = uid for update;
+  if not found or ran is null or ran < now() - make_interval(secs => cfg.running_grace_seconds) then
+    return jsonb_build_object('status', 'not_running', 'bounty', 0, 'balance', bal);
+  end if;
+
+  insert into public.storm_grants (settlement_id, user_id, bounty) values (st.id, uid, st.bounty)
+  on conflict do nothing;
+  if not found then
+    return jsonb_build_object('status', 'already', 'bounty', 0, 'balance', bal);
+  end if;
+  update public.profiles p set balance = p.balance + st.bounty, updated_at = now()
+  where p.id = uid
+  returning p.balance into bal;
+  update public.chain_settlements s set grants_count = s.grants_count + 1, grants_total = s.grants_total + st.bounty
+  where s.id = st.id;
+  return jsonb_build_object('status', 'granted', 'bounty', st.bounty, 'balance', bal);
+end;
+$$;
+
+revoke all on function public.chain_note_error(text) from public, anon, authenticated;
+revoke all on function public.ingest_status(jsonb) from public, anon, authenticated;
+revoke all on function public.ingest_core(jsonb) from public, anon, authenticated;
+revoke all on function public.chain_tick() from public, anon, authenticated;
+revoke all on function public.chain_live() from public;
+grant execute on function public.chain_live() to anon, authenticated;
+revoke all on function public.claim_storm_bounty(text) from public, anon;
+grant execute on function public.claim_storm_bounty(text) to authenticated;
+
+-- Zamanlayıcı: pg_cron varsa her 30 sn (pg_cron 1.5+), değilse her dakika. Eski iş adıyla bulunup silinir.
+do $$
+declare
+  v int[];
+begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.unschedule(j.jobid) from cron.job j where j.jobname = 'squeaksy-chain-tick';
+    select string_to_array(regexp_replace(extversion, '[^0-9.]', '', 'g'), '.')::int[] into v
+    from pg_extension where extname = 'pg_cron';
+    perform cron.schedule('squeaksy-chain-tick', case when v >= array[1, 5] then '30 seconds' else '* * * * *' end,
+      'select public.chain_tick()');
+  end if;
+end;
+$$;

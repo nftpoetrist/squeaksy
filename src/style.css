@@ -1562,6 +1562,252 @@ body::after {
   color: var(--pop-accent);
 }
 
+/* ------------------------------------------------- Squeekchain Live: Gerçek Bulut etiketi, bilgi balonu, fırtına afişi
+ * Fiyat etiketleriyle aynı çentikli koyu yapı; vurgu rengi Rare kartlardaki camgöbeği (#7ee2f8). */
+.real-tag {
+  --real: #7ee2f8;
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  padding: 5px 8px 6px 7px;
+  font-family: var(--pixel-font);
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #e8fcff;
+  background: rgba(8, 20, 34, 0.86);
+  border: none;
+  cursor: pointer;
+  box-shadow:
+    inset 0 0 0 1px rgba(126, 226, 248, 0.5),
+    0 0 0 1px #05040c,
+    0 3px 0 rgba(5, 4, 12, 0.6);
+  clip-path: polygon(2px 0, calc(100% - 2px) 0, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 0 calc(100% - 2px), 0 2px);
+  transition: transform 0.12s ease;
+}
+.real-tag:hover,
+.real-tag[aria-expanded='true'] {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 0 0 1px rgba(126, 226, 248, 0.85),
+    0 0 0 1px #05040c,
+    0 3px 0 rgba(5, 4, 12, 0.6);
+}
+.real-tag:focus-visible {
+  outline: 2px solid var(--real);
+  outline-offset: 2px;
+}
+.real-tag__name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--real);
+}
+.real-tag__dot {
+  width: 5px;
+  height: 5px;
+  background: #4a6a80;
+}
+.real-tag__line {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #ffffff;
+}
+.real-tag__bar {
+  display: flex;
+  gap: 1px;
+}
+.real-tag__bar[hidden] {
+  display: none;
+}
+.real-tag__bar i {
+  width: 5px;
+  height: 4px;
+  background: #1f3a52;
+}
+.real-tag__bar i.is-on {
+  background: var(--real);
+}
+.real-tag[data-state='delayed'] .real-tag__bar i.is-on {
+  background: #5a7a8e;
+}
+.real-tag__state {
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  color: #9fc4d6;
+}
+/* Gerçek çark koşuyor / bloklar iniyor: nokta nabız atar */
+.real-tag[data-state='active'] .real-tag__dot,
+.real-tag[data-state='pending'] .real-tag__dot {
+  background: var(--real);
+  box-shadow: 0 0 6px var(--real);
+  animation: real-dot 1.2s steps(2, jump-none) infinite;
+}
+.real-tag[data-state='active'] .real-tag__state,
+.real-tag[data-state='pending'] .real-tag__state {
+  color: var(--real);
+}
+.real-tag[data-state='idle'] .real-tag__dot {
+  background: #6f9fb4;
+}
+.real-tag[data-state='fault'] .real-tag__dot {
+  background: #ffb03a;
+}
+.real-tag[data-state='delayed'] .real-tag__name,
+.real-tag[data-state='loading'] .real-tag__name {
+  color: #8aa3b4;
+}
+@keyframes real-dot {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Bilgi balonu: kulübe balonunun Rare görünümü, tek sütun */
+.chain-pop {
+  display: block;
+}
+.chain-pop h4 {
+  margin: 4px 0 10px;
+  font-size: 15px;
+  letter-spacing: 0.05em;
+  color: var(--pop-accent);
+}
+.chain-pop__rows {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  background: rgba(126, 226, 248, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(126, 226, 248, 0.18);
+}
+.chain-pop__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+.chain-pop__row b {
+  color: #ffffff;
+  text-align: right;
+}
+.chain-pop .hut-pop__flavor {
+  margin: 0 0 8px;
+}
+.chain-pop__bounty {
+  margin: 0 0 12px;
+  font-size: 10px;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  color: var(--pop-accent);
+}
+.chain-pop__link {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  color: #05232e;
+  background: var(--pop-accent);
+  box-shadow:
+    inset -3px -3px 0 #3fb8e0,
+    inset 3px 3px 0 #d8f8ff,
+    0 0 0 2px #05232e;
+}
+.chain-pop__link:hover {
+  background: #a8f0ff;
+}
+
+/* Gerçek blok inişi: sahnenin üst ortasında kısa afiş */
+.storm-banner {
+  position: absolute;
+  z-index: 4;
+  top: 18px;
+  left: 50%;
+  translate: -50% 0;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  max-width: calc(100% - 32px);
+  padding: 9px 16px 10px;
+  font-family: var(--pixel-font);
+  text-transform: uppercase;
+  text-align: center;
+  color: #e8fcff;
+  background: rgba(6, 22, 36, 0.92);
+  box-shadow:
+    inset 0 0 0 1px rgba(126, 226, 248, 0.7),
+    0 0 0 2px #05040c,
+    0 0 26px rgba(63, 216, 255, 0.35),
+    0 4px 0 rgba(5, 4, 12, 0.6);
+  clip-path: polygon(3px 0, calc(100% - 3px) 0, 100% 3px, 100% calc(100% - 3px), calc(100% - 3px) 100%, 3px 100%, 0 calc(100% - 3px), 0 3px);
+  pointer-events: auto;
+}
+.storm-banner[hidden] {
+  display: none;
+}
+.storm-banner.is-in {
+  animation: storm-in 0.35s steps(4, jump-none);
+}
+.storm-banner__title {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  color: #7ee2f8;
+  text-shadow: 0 0 8px rgba(63, 216, 255, 0.6);
+}
+.storm-banner__sub {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: #b8dce8;
+}
+.storm-banner__sub a {
+  color: #ffffff;
+  text-underline-offset: 3px;
+}
+.storm-banner__reward {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #fff6c8;
+}
+.storm-banner__reward:empty {
+  display: none;
+}
+.storm-banner__signin {
+  padding: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: #ffd84d;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+@keyframes storm-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .storm-banner.is-in,
+  .real-tag[data-state='active'] .real-tag__dot,
+  .real-tag[data-state='pending'] .real-tag__dot {
+    animation: none;
+  }
+}
+
 /* ================================================================================
  * GECE BUZU TEMA (referans: leaderboard görseli; yapı ve kenar dili görselden, tonlar
  * kullanıcı isteğiyle oyun panelinin gece gökyüzüne uyan koyu laciverde çekildi).
@@ -2158,6 +2404,38 @@ body {
 #world[data-px-scale='2'] .hut-tag--item {
   font-size: 8px;
   letter-spacing: 0.02em;
+}
+#world[data-px-scale='2'] .real-tag {
+  gap: 2px;
+  padding: 3px 5px 4px;
+}
+#world[data-px-scale='2'] .real-tag__name {
+  font-size: 7px;
+  letter-spacing: 0.06em;
+}
+#world[data-px-scale='2'] .real-tag__line {
+  font-size: 8px;
+  letter-spacing: 0.02em;
+}
+#world[data-px-scale='2'] .real-tag__state {
+  display: none;
+}
+#world[data-px-scale='2'] .real-tag__bar i {
+  width: 3px;
+  height: 3px;
+}
+/* Küçük sahnede üst kenar dolu (Gerçek Bulut etiketi, ses düğmesi, sayaç): afiş ortadaki boş dağ şeridine iner */
+#world[data-px-scale='2'] .storm-banner {
+  /* çark (solda) ile kulübe (sağda) arasındaki boşluğun ortası */
+  left: 58%;
+  top: 47%;
+  translate: -50% -50%;
+  max-width: min(360px, calc(100% - 32px));
+  padding: 6px 10px 7px;
+}
+#world[data-px-scale='2'] .storm-banner__title {
+  font-size: 10px;
+  letter-spacing: 0.08em;
 }
 
 /* --------------------------------------------- Dik tablet: oyun paneli 16:9 (kulübe ve hamsterler sığsın) */

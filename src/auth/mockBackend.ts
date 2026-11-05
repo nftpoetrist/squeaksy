@@ -104,6 +104,17 @@ export class MockBackend implements AuthBackend {
     }
   }
 
+  /** Yalnızca geliştirme (sahte zincir): bakiyeye ödül ekler, yeni bakiyeyi döner */
+  addMockBalance(n: number): number {
+    try {
+      const next = Number(sessionStorage.getItem(this.key) ?? 0) + Math.max(0, Math.floor(n));
+      sessionStorage.setItem(this.key, String(next));
+      return next;
+    } catch {
+      return 0;
+    }
+  }
+
   private store(k: string, v: string): void {
     try {
       sessionStorage.setItem(`${this.key}.${k}`, v);

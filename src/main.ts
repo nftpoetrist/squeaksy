@@ -20,6 +20,9 @@ import { hutSleepers, mountHutMenu } from './page/hutMenu';
 import { cardById, CARDS, ratePerBlock } from './collection/cards';
 import { MockBackend, UnconfiguredBackend } from './auth/mockBackend';
 import type { AuthBackend, Player } from './auth/types';
+import { ChainFeed } from './chain/feed';
+import type { ChainSource } from './chain/types';
+import { mountRealCloud } from './page/realCloud';
 
 const world = document.getElementById('world');
 if (!world) throw new Error('#world bulunamadı');
@@ -76,6 +79,38 @@ void (async () => {
   };
   // Token sayacı: sahnenin sağ üstü
   const hud = mountTokenHud(world, background, ledger, signIn);
+
+  // Squeekchain Live: Gerçek Bulut, Squeekchain'deki gerçek hamsterin (canlı yayındaki WHEELY9000 çarkı) verisiyle dolar.
+  // Kaynak: önce sunucu (Supabase chain_live: doğrulanmış veri + Block Bounty); sunucu tarafı kurulu değilse
+  // api.squeekchain.com doğrudan okunur (yalnızca görsel, ödül yok).
+  // Test: ?dev&chain=active|idle|fault|delayed|pending|offline → sahte veri; G tuşu gerçek bir inişi tekrar oynatır.
+  const chainMode = DEV ? params.get('chain') : null;
+  const { DirectChainSource, FallbackChainSource } = await import('./chain/directSource');
+  let chainSource: ChainSource;
+  if (chainMode) {
+    const { MockChain } = await import('./chain/mockChain');
+    const mock = new MockChain(chainMode as import('./chain/mockChain').MockChainMode);
+    mock.signedIn = () => ledger.signedIn;
+    mock.running = () => !ledger.capped && background.hamsterRunning && background.hamsterState === 'run';
+    if (backend instanceof MockBackend) mock.credit = (n) => backend.addMockBalance(n);
+    chainSource = mock;
+    const land = () => {
+      mock.land();
+      void chainFeed.poll();
+    };
+    window.addEventListener('keydown', (e) => {
+      if (e.key.toLowerCase() === 'g' && !e.metaKey && !e.ctrlKey) land();
+    });
+    const landAt = Number(params.get('landAt'));
+    if (landAt > 0) window.setTimeout(land, landAt);
+  } else if ('fetchChainLive' in backend && 'claimStormBounty' in backend) {
+    chainSource = new FallbackChainSource(backend as unknown as ChainSource, new DirectChainSource());
+  } else {
+    chainSource = new DirectChainSource();
+  }
+  const chainFeed = new ChainFeed(chainSource);
+  mountRealCloud(world, background, chainFeed, chainSource, ledger, signIn, { controlWeather: !initial });
+  chainFeed.start();
   // Leaderboard: Overall (yıldız) / Top Collectors (kart)
   const lb = document.getElementById('leaderboard');
   const lbUi = lb
