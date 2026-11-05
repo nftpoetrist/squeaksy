@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b1430" />
+    <title>Squeaksy · Hamster-powered pixel idle game</title>
+    <meta name="description" content="Wake your hamster, spin the wheel and fill the block clouds. Earn stars, collect limited hamsters and Pixsy buddies, and climb the leaderboard. Built for the Squeekchain community." />
+    <!-- Paylaşım önizlemesi (X, Discord, Telegram). %SITE_URL%: vite.config.ts, VITE_SITE_URL -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Squeaksy" />
+    <meta property="og:title" content="Squeaksy · Hamster-powered pixel idle game" />
+    <meta property="og:description" content="Wake your hamster, spin the wheel and fill the block clouds. Earn stars, collect limited hamsters and climb the leaderboard." />
+    <meta property="og:url" content="%SITE_URL%/" />
+    <meta property="og:image" content="%SITE_URL%/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="A pixel hamster running in a golden wheel under chained block clouds" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Squeaksy · Hamster-powered pixel idle game" />
+    <meta name="twitter:description" content="Wake your hamster, spin the wheel and fill the block clouds. Earn stars, collect limited hamsters and climb the leaderboard." />
+    <meta name="twitter:image" content="%SITE_URL%/og.png" />
+    <!-- Sekme ikonu: Squeaksy önden yüz portresi (32x32 piksel) -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png?v=2" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header class="nav">
+      <a class="nav__brand" href="#play" aria-label="Squeaksy home">
+        <canvas class="nav__logo" width="16" height="16" aria-hidden="true"></canvas>
+        <span>SQUEAKSY</span>
+      </a>
+      <!-- Telefon / tablet: menü düğmesi (bağlantılar açılır panelde) -->
+      <button class="nav__menu" type="button" aria-label="Menu" aria-expanded="false" aria-controls="nav-links">
+        <i aria-hidden="true"></i>
+      </button>
+      <nav class="nav__links" id="nav-links" aria-label="Sections">
+        <a href="#play">Play</a>
+        <a href="#collection">Collection</a>
+        <a href="#market">Market</a>
+        <a href="#about">About</a>
+        <a href="#leaderboard">Leaderboard</a>
+      </nav>
+      <!-- X ile giriş / profil (src/page/authMenu.ts doldurur) -->
+      <div class="nav__auth" data-auth></div>
+    </header>
+
+    <main>
+      <!-- Living background stage (play area) -->
+      <section id="play" class="stage-section" aria-label="Hamster wheel">
+        <div id="world"></div>
+      </section>
+
+      <!-- Sections to be filled later -->
+      <section id="collection" class="section">
+        <div class="panel">
+          <h2>Collection</h2>
+          <p>Coming soon</p>
+        </div>
+      </section>
+      <section id="market" class="section">
+        <div class="panel">
+          <h2>Market</h2>
+          <p>Coming soon</p>
+        </div>
+      </section>
+      <section id="about" class="section">
+        <div class="panel">
+          <h2>About</h2>
+          <p>Coming soon</p>
+        </div>
+      </section>
+      <!-- Leaderboard: ayrı sayfa görünümü (#leaderboard); src/page/leaderboard.ts doldurur -->
+      <section id="leaderboard" class="section" aria-label="Leaderboard"></section>
+    </main>
+
+    <!-- Alt navbar: piksel zincir ayırıcı + marka, menü, topluluk linkleri -->
+    <footer class="footer" id="footer">
+      <div class="footer__inner">
+        <div class="footer__group" aria-label="Founder">
+          <span class="footer__label">Founder</span>
+          <div class="footer__links">
+            <a class="social social--x" href="https://x.com/NftPoetrist" target="_blank" rel="noopener noreferrer" aria-label="Founder NftPoetrist on X">
+              <i class="social__icon" aria-hidden="true"></i><span>@NftPoetrist</span>
+            </a>
+            <a class="social social--github" href="https://github.com/nftpoetrist/squeaksy" target="_blank" rel="noopener noreferrer" aria-label="Squeaksy source code on GitHub">
+              <i class="social__icon" aria-hidden="true"></i><span>GitHub</span>
+            </a>
+          </div>
+        </div>
+        <div class="footer__group" aria-label="Community">
+          <span class="footer__label">Community</span>
+          <div class="footer__links">
+            <a class="social social--x" href="https://x.com/squeekchain" target="_blank" rel="noopener noreferrer" aria-label="Squeekchain on X">
+              <i class="social__icon" aria-hidden="true"></i><span>@squeekchain</span>
+            </a>
+            <a class="social social--discord" href="https://discord.gg/squeekchain" target="_blank" rel="noopener noreferrer" aria-label="Squeekchain on Discord">
+              <i class="social__icon" aria-hidden="true"></i><span>Discord</span>
+            </a>
+            <a class="social social--web" href="https://squeekchain.com" target="_blank" rel="noopener noreferrer" aria-label="Squeekchain website">
+              <i class="social__icon" aria-hidden="true"></i><span>squeekchain.com</span>
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="footer__bottom">
+        <span>© 2026 Squeaksy</span>
+        <!-- Çizginin üstünde uyuyan Skyeaksy + ETH Pixsy (src/page/footer.ts çizer) -->
+        <canvas class="footer__sleeper" aria-hidden="true"></canvas>
+        <span>Built for the Squeekchain community</span>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Squeaksy · Hamster base character</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" />
+    <style>
+      body { margin: 0; min-height: 100vh; background: #0c0a14; color: #ece9f5; font-family: 'Silkscreen', monospace; display: flex; flex-direction: column; align-items: center; gap: 28px; padding: 40px 24px; box-sizing: border-box; }
+      h1 { margin: 0; font-size: 22px; letter-spacing: .1em; color: #ffd84d; }
+      p { margin: 0; color: #a7a1c2; font-size: 12px; letter-spacing: .06em; text-align: center; max-width: 720px; }
+      .row { display: flex; gap: 36px; align-items: flex-end; flex-wrap: wrap; justify-content: center; }
+      figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+      figcaption { font-size: 11px; color: #6f6a8a; letter-spacing: .08em; }
+      canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+      .tile { padding: 18px; border-radius: 14px; background: #1a1530; box-shadow: 0 0 0 1px rgba(255,255,255,.08); }
+      .tile.sky { background: linear-gradient(#2a1e5c, #4b3488); }
+      .swatches { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: 720px; }
+      .sw { width: 26px; height: 26px; border-radius: 4px; box-shadow: 0 0 0 1px rgba(255,255,255,.12); }
+    </style>
+  </head>
+  <body>
+    <h1>SQUEAKSY · HAMSTER + SQUEEK BUDDY</h1>
+    <p>A tiny Squeekchain emblem buddy rides on the hamster's back. It bounces one frame behind the body while running.</p>
+    <div class="row" id="views"></div>
+    <div class="swatches" id="palette"></div>
+    <script type="module" src="/src/character/preview.ts"></script>
+  </body>
+</html>

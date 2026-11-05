@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Squeaksy · Cards</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- Kart tasarım önizlemesi: sahip olunan kartlar + üç nadirlik görünümü -->
+    <section id="hamsters" class="section"></section>
+    <section id="collection" class="section"></section>
+    <section id="about" class="section"></section>
+    <script type="module">
+      import { mountCollection } from '/src/collection/collection.ts';
+      import { mountAbout } from '/src/page/about.ts';
+      // ?footer → ana sayfadaki alt navbarı tek başına göster (tasarım önizlemesi)
+      if (new URLSearchParams(location.search).has('footer')) {
+        const html = await (await fetch('/index.html')).text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        document.body.replaceChildren(doc.querySelector('footer'));
+        const { drawStaticWheel } = await import('/src/page/logoIntro.ts');
+        for (const c of document.querySelectorAll('.footer__logo, .footer__emblem')) drawStaticWheel(c);
+        document.body.style.paddingTop = '300px';
+        throw new Error('footer-only preview');
+      }
+      // ?about → sadece About bölümü (tasarım önizlemesi)
+      if (new URLSearchParams(location.search).has('about')) {
+        document.getElementById('hamsters').remove();
+        document.getElementById('collection').remove();
+        mountAbout(document.getElementById('about'));
+        throw new Error('about-only preview');
+      }
+      import { mountHamsterShop } from '/src/collection/hamsterShop.ts';
+      import { MockBackend } from '/src/auth/mockBackend.ts';
+      import { TokenLedger } from '/src/auth/ledger.ts';
+      import { Inventory } from '/src/auth/inventory.ts';
+      // Önizleme: ?user=deneme&balance=900&buy=sky-unicorn&equip=sky-unicorn&sell=sky-unicorn (sahte oturum, gerçek bakiyeye dokunmaz)
+      const q = new URLSearchParams(location.search);
+      const user = q.get('user');
+      const backend = new MockBackend(user ?? 'preview', Number(q.get('balance')) || 0);
+      const ledger = new TokenLedger(backend);
+      const inv = new Inventory(backend, ledger);
+      mountHamsterShop(document.getElementById('hamsters'), inv, ledger, () => alert('Sign in with X'));
+      mountCollection(document.getElementById('collection'), { preview: q.has('preview'), source: inv });
+      void inv.refreshSupply();
+      if (user) {
+        const p = await backend.init();
+        await ledger.setPlayer(p);
+        await inv.setPlayer(p);
+        for (const id of (q.get('buy') ?? '').split(',').filter(Boolean)) await inv.buy(id);
+        if (q.get('equip')) await inv.equip(q.get('equip'));
+        for (const id of (q.get('sell') ?? '').split(',').filter(Boolean)) await inv.sell(id);
+        for (const id of (q.get('toggle') ?? '').split(',').filter(Boolean)) await inv.toggleItem(id);
+        // ?ask=buy:sky-unicorn&yes → onay panelini açar (ve Evet'e basar)
+        const ask = q.get('ask');
+        if (ask) {
+          const [kind, id] = ask.split(':');
+          document.querySelector(`.shop__slot[data-card="${id}"] ${kind === 'sell' ? '.shop__sell' : '.shop__buy'}`)?.click();
+          if (q.has('yes')) document.querySelector('.px-btn--buy, .px-btn--sell')?.click();
+        }
+      }
+    </script>
+  </body>
+</html>

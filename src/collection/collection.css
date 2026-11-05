@@ -1,0 +1,1982 @@
+/* ================================================================ Koleksiyon */
+.collection__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.collection__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.panel h2.collection__title {
+  margin: 0 0 8px;
+}
+
+.panel h2.collection__title--small {
+  margin: 12px 0 0;
+  font-size: 16px;
+  color: var(--text-soft);
+}
+
+.panel p.collection__sub {
+  font-size: 12px;
+}
+
+.collection__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.legend--common {
+  color: #c9cfdb;
+}
+.legend--rare {
+  color: #7ee2f8;
+}
+.legend--legendary {
+  color: #ffd84d;
+}
+
+.collection__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 240px);
+  gap: 32px 28px;
+  justify-content: start;
+  padding: 6px 4px 10px;
+}
+
+/* ================================================================ Nadirlik taşları */
+.gem {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+}
+
+.gem--common {
+  border-radius: 50%;
+  background: #9aa3b5;
+  box-shadow: inset -2px -2px 0 #6b7385, 0 0 0 1px #2a2d3a;
+}
+
+.gem--rare {
+  transform: rotate(45deg) scale(0.85);
+  background: linear-gradient(135deg, #d8fbff, #4fb8ff 45%, #2a5cff);
+  box-shadow: 0 0 0 1px #0b1640, 0 0 8px rgba(79, 184, 255, 0.8);
+}
+
+.gem--legendary {
+  width: 13px;
+  height: 13px;
+  background: linear-gradient(135deg, #fff6c8, #ffc93c 50%, #d8961e);
+  clip-path: polygon(50% 0, 63% 35%, 100% 38%, 71% 61%, 81% 100%, 50% 78%, 19% 100%, 29% 61%, 0 38%, 37% 35%);
+  filter: drop-shadow(0 0 4px rgba(255, 201, 60, 0.9));
+}
+
+/* ================================================================ Kart */
+.card {
+  --rx: 0deg;
+  --ry: 0deg;
+  --mx: 50%;
+  --my: 50%;
+  --hyp: 0;
+  position: relative;
+  width: 240px;
+  aspect-ratio: 63 / 88;
+  perspective: 900px;
+  font-family: var(--pixel-font);
+  outline: none;
+}
+
+.card__inner {
+  position: relative;
+  height: 100%;
+  padding: 8px;
+  border-radius: 14px;
+  background: var(--frame);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transform: rotateX(var(--rx)) rotateY(var(--ry));
+  transition:
+    transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 0.3s ease,
+    translate 0.3s ease;
+  will-change: transform;
+}
+
+.card.is-active .card__inner {
+  transition:
+    transform 0.08s linear,
+    box-shadow 0.3s ease,
+    translate 0.3s ease;
+}
+
+.card:hover .card__inner,
+.card:focus-visible .card__inner {
+  translate: 0 -6px;
+}
+
+.card:focus-visible .card__inner {
+  outline: 2px solid #8cc2e8;
+  outline-offset: 4px;
+}
+
+.card__frame {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  height: 100%;
+  padding: 8px 9px 7px;
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow:
+    inset 0 0 0 1px var(--edge),
+    inset 0 0 0 3px rgba(0, 0, 0, 0.35);
+  color: #ece9f5;
+}
+
+/* --- Üst şerit */
+.card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card__title {
+  min-width: 0;
+}
+
+.card__kind {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 7px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.85;
+}
+
+.card__name {
+  margin: 3px 0 0;
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--name, #ffffff);
+}
+
+.card__power {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  flex: none;
+  color: var(--accent);
+}
+
+.card__power small {
+  font-size: 7px;
+  letter-spacing: 0.1em;
+}
+
+.card__power b {
+  font-size: 18px;
+  line-height: 1;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55);
+}
+
+/* --- Görsel penceresi */
+.card__art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  height: 112px;
+  overflow: hidden;
+  border-radius: 4px;
+  box-shadow:
+    0 0 0 2px var(--art-edge),
+    0 0 0 3px rgba(0, 0, 0, 0.5);
+}
+
+.card__art-bg {
+  position: absolute;
+  inset: 0;
+  background: var(--art-bg);
+}
+
+/* Zemin gölgesi */
+.card__art::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  width: 92px;
+  height: 10px;
+  translate: -50% 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.card__sprite {
+  position: relative;
+  z-index: 1;
+  margin-top: 6px;
+}
+
+.card__art--sky .card__sprite,
+.card__art--inferno .card__sprite {
+  margin-top: -4px;
+}
+
+.card__sprite {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.card__count {
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  right: 6px;
+  padding: 3px 5px;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  color: #0c0a1c;
+  background: var(--accent);
+}
+
+/* --- Yetenekler / istatistikler */
+.card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.card__ability b {
+  display: block;
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.card__ability p,
+.card__flavor {
+  margin: 2px 0 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 10px;
+  line-height: 1.3;
+  letter-spacing: 0;
+  color: rgba(236, 233, 245, 0.86);
+}
+
+.card__stats {
+  display: grid;
+  gap: 3px;
+  padding: 5px 6px;
+  background: rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 0 0 1px var(--edge);
+}
+
+.card__stat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 7.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(236, 233, 245, 0.7);
+}
+
+.card__pips {
+  display: flex;
+  gap: 2px;
+}
+
+.card__pips i {
+  width: 7px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.card__pips i.on {
+  background: var(--accent);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+}
+
+.card__flavor {
+  margin-top: auto;
+  font-size: 9px;
+  font-style: italic;
+  color: rgba(236, 233, 245, 0.55);
+}
+
+.card__locked-text {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  margin: 0;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(236, 233, 245, 0.45);
+  border: 1px dashed var(--edge);
+}
+
+/* --- Alt şerit */
+.card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 5px;
+  font-size: 7.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-top: 1px solid var(--edge);
+}
+
+.card__rarity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+}
+
+.card__no {
+  color: rgba(236, 233, 245, 0.5);
+}
+
+/* --- Parlama katmanları (common'da kapalı) */
+.card__foil,
+.card__glare,
+.card__sparkles {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.card__foil,
+.card__glare {
+  display: none;
+}
+
+/* ================================================================ COMMON: sade, mat, parlamaz */
+.card--common {
+  --frame: linear-gradient(160deg, #b3b9c6, #8a91a2 55%, #737a8b);
+  --panel: linear-gradient(180deg, #1d1c27, #16151e);
+  --edge: rgba(201, 207, 219, 0.18);
+  --accent: #c9cfdb;
+  --art-edge: #6b7385;
+  --art-bg:
+    linear-gradient(transparent 72%, #2a2c38 72%, #232530),
+    linear-gradient(180deg, #343747, #262836);
+  --shadow: 0 10px 22px rgba(0, 0, 0, 0.45);
+}
+
+/* ================================================================ RARE: safir holo, ışıltılı */
+.card--rare {
+  --frame: linear-gradient(135deg, #d8fbff 0%, #5fc8ff 18%, #2a5cff 42%, #7a5cff 60%, #4fb8ff 80%, #d8fbff 100%);
+  --panel: linear-gradient(180deg, #111c44, #0a1029);
+  --edge: rgba(126, 226, 248, 0.28);
+  --accent: #7ee2f8;
+  --name: #e6fbff;
+  --art-edge: #4fb8ff;
+  --art-bg:
+    radial-gradient(1px 1px at 18% 22%, #fff 99%, transparent),
+    radial-gradient(1px 1px at 72% 16%, #fff 99%, transparent),
+    radial-gradient(1px 1px at 86% 40%, #bfe6ff 99%, transparent),
+    radial-gradient(1px 1px at 34% 48%, #bfe6ff 99%, transparent),
+    radial-gradient(1px 1px at 58% 30%, #fff 99%, transparent),
+    linear-gradient(transparent 72%, #142a6a 72%, #0e1d4d),
+    radial-gradient(120% 90% at 50% 0%, #3b6cf0, #16296e 60%, #0b1640);
+  --shadow:
+    0 0 0 1px rgba(126, 226, 248, 0.45),
+    0 0 22px rgba(70, 160, 255, 0.4),
+    0 16px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* Rare: çizgili folyo yok; sadece fareyle gelen parlama + safir ışıltı */
+
+.card--rare .card__glare,
+.card--legendary .card__glare {
+  display: block;
+  background: radial-gradient(circle at var(--mx) var(--my), rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 48%);
+  mix-blend-mode: overlay;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.card.is-active .card__glare {
+  opacity: 1;
+}
+
+.card--rare:hover .card__inner {
+  box-shadow:
+    0 0 0 1px rgba(126, 226, 248, 0.7),
+    0 0 34px rgba(70, 160, 255, 0.6),
+    0 22px 40px rgba(0, 0, 0, 0.55);
+}
+
+/* ================================================================ LEGENDARY: efsanevi altın + gökkuşağı folyo */
+.card--legendary {
+  --frame: linear-gradient(
+    120deg,
+    #fff6c8 0%,
+    #ffc93c 14%,
+    #b8701a 28%,
+    #ffe27a 42%,
+    #c8861e 56%,
+    #fff0a0 70%,
+    #ffb83a 84%,
+    #fff6c8 100%
+  );
+  --panel: linear-gradient(180deg, #33200c, #1a1006 70%, #22150a);
+  --edge: rgba(255, 216, 77, 0.32);
+  --accent: #ffd84d;
+  --art-edge: #ffc93c;
+  --art-bg:
+    linear-gradient(transparent 72%, #5a3210 72%, #3a1e08),
+    radial-gradient(90% 80% at 50% 60%, #ffd06a, #e0782a 45%, #6a2a5a 80%, #2a1030);
+  --shadow:
+    0 0 0 1px #ffe27a,
+    0 0 26px rgba(255, 190, 60, 0.55),
+    0 0 60px rgba(255, 110, 200, 0.18),
+    0 18px 36px rgba(0, 0, 0, 0.55);
+}
+
+.card--legendary .card__inner {
+  background-size: 250% 250%;
+  animation:
+    gold-sheen 5s linear infinite,
+    legend-aura 2.6s ease-in-out infinite;
+}
+
+.card--legendary .card__name {
+  background: linear-gradient(90deg, #fff6c8, #ffc93c, #fff0a0, #ffb83a);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gold-sheen 4s linear infinite;
+}
+
+.card--legendary .card__foil {
+  display: block;
+  background:
+    linear-gradient(125deg, #ff8ad8, #ffd86e, #fff3b0, #ffb36e, #d79aff, #ff8ad8),
+    repeating-linear-gradient(60deg, transparent 0 6px, rgba(255, 255, 255, 0.18) 7px, transparent 9px 16px);
+  background-size:
+    300% 300%,
+    200% 200%;
+  background-position: var(--mx) var(--my);
+  mix-blend-mode: soft-light;
+  opacity: 0.6;
+  animation: holo-shift 6s ease-in-out infinite alternate;
+}
+
+/* Dönen ışık huzmeleri (zeminin arkasında) */
+.card--legendary .card__art-bg::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  width: 320px;
+  height: 320px;
+  translate: -50% -50%;
+  background: repeating-conic-gradient(rgba(255, 236, 160, 0.26) 0 8deg, transparent 8deg 20deg);
+  -webkit-mask: radial-gradient(circle, #000 20%, transparent 62%);
+  mask: radial-gradient(circle, #000 20%, transparent 62%);
+  animation: rays-spin 24s linear infinite;
+}
+
+.card--legendary .card__art-bg::after {
+  content: '';
+  position: absolute;
+  inset: 72% 0 0;
+  background: linear-gradient(#5a3210, #3a1e08);
+}
+
+.card--legendary:hover .card__foil,
+.card--legendary.is-active .card__foil {
+  opacity: calc(0.7 + var(--hyp) * 0.3);
+}
+
+/* Parıldayan piksel yıldızlar */
+.card__sparkles i {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: #fff;
+  box-shadow:
+    0 -3px 0 #fff6c8,
+    0 3px 0 #fff6c8,
+    -3px 0 0 #fff6c8,
+    3px 0 0 #fff6c8;
+  opacity: 0;
+  animation: twinkle 2.4s ease-in-out infinite;
+}
+
+.card__sparkles i:nth-child(1) { left: 12%; top: 9%; animation-delay: 0s; }
+.card__sparkles i:nth-child(2) { left: 82%; top: 14%; animation-delay: 0.7s; }
+.card__sparkles i:nth-child(3) { left: 24%; top: 34%; animation-delay: 1.3s; }
+.card__sparkles i:nth-child(4) { left: 74%; top: 38%; animation-delay: 0.3s; }
+.card__sparkles i:nth-child(5) { left: 50%; top: 24%; animation-delay: 1.9s; }
+.card__sparkles i:nth-child(6) { left: 8%; top: 62%; animation-delay: 1.1s; }
+.card__sparkles i:nth-child(7) { left: 90%; top: 70%; animation-delay: 1.6s; }
+.card__sparkles i:nth-child(8) { left: 40%; top: 88%; animation-delay: 0.5s; }
+.card__sparkles i:nth-child(9) { left: 66%; top: 94%; animation-delay: 2.1s; }
+
+/* ================================================================ Kilitli (keşfedilmemiş) */
+.card--locked .card__sprite {
+  opacity: 0.85;
+  filter: drop-shadow(0 0 6px var(--accent));
+}
+
+.card--locked .card__name {
+  opacity: 0.75;
+}
+
+.card--locked .card__art::after {
+  display: none;
+}
+
+/* ================================================================ Animasyonlar */
+@keyframes holo-shift {
+  0% { background-position: 0% 50%, 0% 0%; filter: hue-rotate(0deg); }
+  100% { background-position: 100% 50%, 100% 100%; filter: hue-rotate(25deg); }
+}
+
+@keyframes gold-sheen {
+  from { background-position: 0% 50%; }
+  to { background-position: 250% 50%; }
+}
+
+@keyframes legend-aura {
+  0%, 100% {
+    box-shadow: 0 0 0 1px #ffe27a, 0 0 22px rgba(255, 190, 60, 0.45), 0 0 50px rgba(255, 110, 200, 0.14), 0 18px 36px rgba(0, 0, 0, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 1px #fff6c8, 0 0 38px rgba(255, 200, 80, 0.75), 0 0 80px rgba(255, 110, 200, 0.28), 0 18px 36px rgba(0, 0, 0, 0.55);
+  }
+}
+
+@keyframes rays-spin {
+  to { rotate: 360deg; }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0; scale: 0.4; }
+  50% { opacity: 1; scale: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card__inner,
+  .card__foil,
+  .card__name,
+  .card__art-bg::before,
+  .card__sparkles i {
+    animation: none !important;
+  }
+  .card__sparkles i {
+    opacity: 0.6;
+  }
+}
+
+@media (max-width: 720px) {
+  /* Yalnızca çok satırlı ızgara ortalanır; taşan yatay sıra (--row) ortalanırsa ilk kartlara ulaşılamaz */
+  .collection__grid:not(.collection__grid--row) {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 240px));
+    justify-content: center;
+  }
+}
+
+/* ================================================================ Satılık (henüz alınmamış) */
+.card--for-sale .card__sprite {
+  filter: saturate(0.85) brightness(0.8);
+}
+
+.card--for-sale .card__body {
+  opacity: 0.7;
+}
+
+.card__lock {
+  position: absolute;
+  z-index: 2;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 5px 6px;
+  font-size: 7.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(236, 233, 245, 0.85);
+  background: rgba(8, 6, 20, 0.78);
+  box-shadow: inset 0 0 0 1px var(--edge);
+}
+
+.card__lock b {
+  font-size: 10px;
+  color: var(--accent);
+}
+
+.card__count--running {
+  color: #0c2a3a;
+  background: #7ee2f8;
+}
+
+/* ================================================================ Hamsters bölümü (satın alma) */
+.shop__grid {
+  grid-template-columns: repeat(auto-fill, 240px);
+  gap: 36px 28px;
+}
+
+.shop__slot {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shop__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 6px 6px 6px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.shop__row--rare {
+  box-shadow: inset 0 0 0 1px rgba(126, 226, 248, 0.35);
+}
+
+.shop__row--legendary {
+  box-shadow: inset 0 0 0 1px rgba(255, 216, 77, 0.4);
+}
+
+.shop__state {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #c9cfdb;
+}
+
+.shop__state.is-running {
+  color: #7ee2f8;
+}
+
+.shop__price {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: #ffd84d;
+  white-space: nowrap;
+}
+
+.shop__coin {
+  width: 10px;
+  height: 10px;
+  background: linear-gradient(160deg, #fff6c8, #ffc93c 45%, #d8961e);
+  clip-path: var(--star-shape);
+}
+
+.shop__btn {
+  padding: 7px 10px 8px;
+  font-family: var(--pixel-font);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #3a1e08;
+  background: #ffd84d;
+  border: none;
+  cursor: pointer;
+  box-shadow:
+    inset -2px -2px 0 #d8961e,
+    inset 2px 2px 0 #fff0a0,
+    0 0 0 2px #3a1e08;
+}
+
+.shop__btn:hover:not(:disabled) {
+  background: #ffe27a;
+}
+
+.shop__btn:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.7) brightness(0.7);
+}
+
+.shop__row--buy {
+  padding: 0;
+  box-shadow: none;
+  background: none;
+}
+
+/* Satın alma: tek, net, her zaman altın renkte buton */
+.shop__buy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px 11px;
+  font-family: var(--pixel-font);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #3a1e08;
+  background: #ffd84d;
+  border: none;
+  cursor: pointer;
+  box-shadow:
+    inset -3px -3px 0 #d8961e,
+    inset 3px 3px 0 #fff0a0,
+    0 0 0 2px #3a1e08,
+    0 5px 0 2px #3a1e08;
+  transition: transform 0.06s ease, background 0.15s ease;
+}
+
+.shop__buy:hover {
+  background: #ffe27a;
+}
+
+.shop__buy:active {
+  transform: translateY(3px);
+}
+
+.shop__buy:focus-visible {
+  outline: 2px solid #8cc2e8;
+  outline-offset: 6px;
+}
+
+.shop__buy .shop__coin {
+  width: 14px;
+  height: 14px;
+  background: linear-gradient(160deg, #fff6c8, #ffffff 30%, #e8a62a);
+  filter: drop-shadow(0 1px 0 #3a1e08);
+}
+
+/* Satın al: canlı yeşil (sahip olunanlar beyazımsı) */
+.shop__buy:not(.shop__buy--owned) {
+  color: #0b2a16;
+  background: #46d873;
+  box-shadow:
+    inset -3px -3px 0 #1f9a48,
+    inset 3px 3px 0 #a8f5bd,
+    0 0 0 2px #0b2a16,
+    0 5px 0 2px #0b2a16;
+}
+
+.shop__buy:not(.shop__buy--owned):hover {
+  background: #5ee888;
+}
+
+.shop__buy:not(.shop__buy--owned) .shop__coin {
+  background: linear-gradient(160deg, #fff6c8, #ffd84d 45%, #e8a62a);
+  filter: drop-shadow(0 1px 0 #0b2a16);
+}
+
+/* Sahip olunan: Buy ile aynı biçim, beyazımsı */
+.shop__buy--owned {
+  color: #1c1838;
+  background: #f2f0ff;
+  box-shadow:
+    inset -3px -3px 0 #b9b2e8,
+    inset 3px 3px 0 #ffffff,
+    0 0 0 2px #1c1838,
+    0 5px 0 2px #1c1838;
+}
+
+.shop__buy--owned:hover {
+  background: #ffffff;
+}
+
+.shop__buy--owned.is-running {
+  cursor: default;
+  transform: none;
+}
+
+.shop__buy--owned.is-running:hover {
+  background: #f2f0ff;
+}
+
+/* Piksel onay işareti */
+.shop__check {
+  width: 12px;
+  height: 9px;
+  background: #2a9c6a;
+  clip-path: polygon(0 45%, 18% 30%, 40% 55%, 82% 0, 100% 18%, 40% 100%);
+}
+
+.shop__btn--ghost {
+  color: #e6fbff;
+  background: #1d3a6a;
+  box-shadow:
+    inset -2px -2px 0 #12284c,
+    inset 2px 2px 0 #3a64a8,
+    0 0 0 2px #0a1430;
+}
+
+.shop__btn--ghost:hover:not(:disabled) {
+  background: #25497f;
+}
+
+.panel p.shop__msg {
+  min-height: 1em;
+  margin: -4px 0 0;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-align: center;
+  color: rgba(236, 233, 245, 0.6);
+}
+
+/* Oyun panelinden "Buy" ile gelince kart kısa süre parlar */
+.shop__slot.is-focus .card__inner {
+  animation: shop-focus 1.6s ease-out 1;
+}
+
+@keyframes shop-focus {
+  0%,
+  60% {
+    outline: 3px solid #fff6c8;
+    outline-offset: 6px;
+  }
+  100% {
+    outline: 3px solid transparent;
+    outline-offset: 10px;
+  }
+}
+
+/* Satış onayı (kırmızı Sell stilleri Market alt satırı bölümünde) */
+.shop__sell.is-confirm {
+  color: #fff;
+  background: #c8323e;
+  box-shadow:
+    inset -2px -2px 0 #8e1424,
+    inset 2px 2px 0 #f0606a,
+    0 0 0 2px #2a0408;
+}
+
+.shop__sell:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+
+/* Eşya: tak butonu (altın; yeşil sadece satın almada) */
+.shop__buy.shop__buy--wear {
+  color: #3a1e08;
+  background: #ffd84d;
+  box-shadow:
+    inset -3px -3px 0 #d8961e,
+    inset 3px 3px 0 #fff0a0,
+    0 0 0 2px #3a1e08,
+    0 5px 0 2px #3a1e08;
+}
+
+.shop__buy.shop__buy--wear:hover {
+  background: #ffe27a;
+}
+
+/* Piksel oynat üçgeni (hamster: Run with) */
+.shop__play {
+  width: 9px;
+  height: 11px;
+  background: #3a1e08;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+/* Piksel artı işareti */
+.shop__plus {
+  width: 10px;
+  height: 10px;
+  background:
+    linear-gradient(#3a1e08, #3a1e08) center / 10px 2px no-repeat,
+    linear-gradient(#3a1e08, #3a1e08) center / 2px 10px no-repeat;
+}
+
+/* Koleksiyon ızgarasında eşya kartı + butonu (kartlarla hizalı) */
+.collection__grid > .shop__slot {
+  width: 240px;
+}
+
+/* Hamsters bölümündeki "Pixsy buddies" satırı */
+.shop__subhead {
+  margin-top: 18px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+/* ================================================================ Collection: tek sıra, sağa kayan şerit */
+.collection__scroller {
+  position: relative;
+}
+
+.collection__grid--row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 28px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 10px 6px 18px;
+  scroll-snap-type: x proximity;
+  scroll-padding: 0 6px;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #4b3a86 transparent;
+}
+
+.collection__grid--row {
+  align-items: flex-start;
+}
+
+.collection__grid--row > * {
+  flex: none;
+  scroll-snap-align: start;
+}
+
+/* Piksel kaydırma çubuğu */
+.collection__grid--row::-webkit-scrollbar {
+  height: 8px;
+}
+
+.collection__grid--row::-webkit-scrollbar-thumb {
+  background: #4b3a86;
+  box-shadow: inset 0 0 0 1px #6a5cc8;
+}
+
+.collection__grid--row::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Kenarlarda kaybolan şerit: devamı olduğunu gösterir */
+.collection__scroller.is-scrollable::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 18px;
+  width: 48px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(14, 12, 22, 0.85));
+}
+
+/* Ok butonları (piksel) */
+.scroll-btn {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  translate: 0 -60%;
+  display: none;
+  width: 36px;
+  height: 52px;
+  font-family: var(--pixel-font);
+  font-size: 26px;
+  line-height: 1;
+  color: #1c1838;
+  background: #f2f0ff;
+  border: none;
+  cursor: pointer;
+  box-shadow:
+    inset -3px -3px 0 #b9b2e8,
+    inset 3px 3px 0 #ffffff,
+    0 0 0 2px #1c1838,
+    0 4px 0 2px #1c1838;
+}
+
+.collection__scroller.is-scrollable .scroll-btn {
+  display: block;
+}
+
+.scroll-btn:hover:not(:disabled) {
+  background: #ffffff;
+}
+
+.scroll-btn:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.scroll-btn--prev {
+  left: -14px;
+}
+
+.scroll-btn--next {
+  right: -14px;
+}
+
+/* Pixsy kartları: üç türün gövdesi aynı boyda ve aynı zemin çizgisinde (boynuz/alev yukarı taşar) */
+.card__art--pixsy .card__sprite,
+.card__art--pixsy-eth .card__sprite,
+.card__art--pixsy-btc .card__sprite {
+  align-self: end;
+  margin: 0 0 13px;
+}
+
+.card__art--pixsy-eth .card__sprite,
+.card__art--pixsy-btc .card__sprite {
+  margin-bottom: 5px;
+}
+
+/* ================================================================ "Yakında" kartı (market) */
+.card--soon {
+  --frame: linear-gradient(150deg, #5a4aa8, #2c2560 45%, #3b3270 70%, #6a5cc8);
+  --panel: linear-gradient(180deg, #17142e, #100d22);
+  --edge: rgba(169, 150, 255, 0.28);
+  --accent: #b9a8ff;
+  --name: #e8e2ff;
+  --art-edge: #6a5cc8;
+  --art-bg:
+    radial-gradient(1px 1px at 22% 30%, #b9a8ff 99%, transparent),
+    radial-gradient(1px 1px at 76% 22%, #ffffff 99%, transparent),
+    radial-gradient(1px 1px at 60% 70%, #b9a8ff 99%, transparent),
+    radial-gradient(90% 90% at 50% 55%, #2e2766, #14112c 70%);
+  --shadow: 0 0 0 1px rgba(169, 150, 255, 0.3), 0 0 20px rgba(120, 100, 230, 0.25), 0 14px 28px rgba(0, 0, 0, 0.5);
+}
+
+/* Üstünden geçen yumuşak ışıltı */
+.card--soon .card__inner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, rgba(200, 190, 255, 0.16) 50%, transparent 65%);
+  background-size: 250% 100%;
+  animation: soon-sheen 3.6s ease-in-out infinite;
+}
+
+/* Soru işareti nabız gibi parlar */
+.card--soon .card__sprite {
+  opacity: 1;
+  filter: drop-shadow(0 0 6px #b9a8ff);
+  animation: soon-pulse 1.8s steps(6) infinite;
+}
+
+.card__soon {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  text-align: center;
+  border: 1px dashed var(--edge);
+}
+
+.card__soon b {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.card__soon p {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 11px;
+  line-height: 1.45;
+  color: rgba(236, 233, 245, 0.75);
+}
+
+/* Altındaki etiket: buton biçiminde ama tıklanamaz, kesik kenarlı */
+.shop__buy.shop__buy--soon {
+  cursor: default;
+  color: #b9a8ff;
+  background: transparent;
+  box-shadow: none;
+  border: 2px dashed rgba(169, 150, 255, 0.5);
+}
+
+.shop__buy.shop__buy--soon:hover {
+  background: rgba(169, 150, 255, 0.06);
+}
+
+@keyframes soon-sheen {
+  0%,
+  20% {
+    background-position: 120% 0;
+  }
+  80%,
+  100% {
+    background-position: -20% 0;
+  }
+}
+
+@keyframes soon-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 3px #b9a8ff);
+    translate: 0 0;
+  }
+  50% {
+    filter: drop-shadow(0 0 10px #d4c8ff);
+    translate: 0 -2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card--soon .card__inner::after,
+  .card--soon .card__sprite {
+    animation: none;
+  }
+}
+
+.gem--soon {
+  width: 10px;
+  height: 10px;
+  background: #b9a8ff;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+  animation: soon-pulse 1.8s steps(6) infinite;
+}
+
+/* ================================================================ Sınırlı arz */
+.card__limited {
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  left: 6px;
+  padding: 3px 5px;
+  font-size: 7px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 0 0 1px var(--edge);
+}
+
+/* ---------------------------------------------------------------- Market alt satırı: arz sayacı | Sell */
+.shop__foot {
+  --accent: #b9a8ff;
+  --accent-dim: rgba(185, 168, 255, 0.16);
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-top: 6px;
+  background: rgba(0, 0, 0, 0.32);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.1),
+    0 3px 0 rgba(0, 0, 0, 0.45);
+  clip-path: polygon(3px 0, calc(100% - 3px) 0, 100% 3px, 100% calc(100% - 3px), calc(100% - 3px) 100%, 3px 100%, 0 calc(100% - 3px), 0 3px);
+}
+
+.shop__foot--rare {
+  --accent: #7ee2f8;
+  --accent-dim: rgba(126, 226, 248, 0.14);
+}
+
+.shop__foot--legendary {
+  --accent: #ffd84d;
+  --accent-dim: rgba(255, 216, 77, 0.14);
+}
+
+/* Sınırlı arz sayacı */
+.shop__meter {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 10px 9px;
+}
+
+.shop__meter-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.shop__meter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.shop__meter-gem {
+  width: 7px;
+  height: 7px;
+  background: var(--accent);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+.shop__meter-count {
+  white-space: nowrap;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: rgba(236, 233, 245, 0.5);
+}
+
+.shop__meter-count b {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+
+/* 20 piksel hücre: dolu olanlar kalan arzı gösterir */
+.shop__meter-bar {
+  display: grid;
+  grid-template-columns: repeat(20, 1fr);
+  gap: 2px;
+  height: 9px;
+  padding: 2px;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.shop__meter-bar i {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.shop__meter-bar i.is-on {
+  background: var(--accent);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  animation: meter-glint 4.2s steps(1) calc(1.4s + var(--i) * 70ms) infinite;
+}
+
+/* Ekrana girmeden önce boş; girince hücre hücre dolar */
+.shop__meter-bar.is-wait i.is-on {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: none;
+  animation: none;
+}
+
+.shop__meter-bar.is-filling i.is-on {
+  animation:
+    meter-fill 0.01s steps(1) calc(var(--i) * 75ms) both,
+    meter-pop 0.22s steps(2) calc(var(--i) * 75ms) both,
+    meter-glint 4.2s steps(1) calc(2.6s + var(--i) * 70ms) infinite;
+}
+
+@keyframes meter-fill {
+  from {
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: none;
+  }
+}
+
+@keyframes meter-pop {
+  0% {
+    filter: brightness(2.2);
+  }
+  100% {
+    filter: none;
+  }
+}
+
+/* Dolu hücrelerde soldan sağa kayan tek piksel parıltı */
+@keyframes meter-glint {
+  0% {
+    filter: brightness(1.9);
+  }
+  3% {
+    filter: none;
+  }
+}
+
+/* Sell: kırmızı piksel buton, sayaçtan ince bir çizgiyle ayrılır */
+.shop__sell {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 86px;
+  margin: 0;
+  padding: 8px 12px;
+  font-family: var(--pixel-font);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fff;
+  background: #d23b48;
+  border: none;
+  cursor: pointer;
+  box-shadow:
+    inset -3px -3px 0 #8e1424,
+    inset 3px 3px 0 #f2727b,
+    -2px 0 0 rgba(0, 0, 0, 0.55);
+  transition: background 0.15s ease, transform 0.06s ease;
+}
+
+.shop__meter + .shop__sell {
+  margin-left: 2px;
+}
+
+.shop__foot > .shop__sell:only-child {
+  width: 100%;
+}
+
+.shop__sell:hover:not(:disabled) {
+  color: #fff;
+  background: #e24955;
+  box-shadow:
+    inset -3px -3px 0 #8e1424,
+    inset 3px 3px 0 #ff8a92,
+    -2px 0 0 rgba(0, 0, 0, 0.55);
+}
+
+.shop__sell:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.shop__sell:focus-visible {
+  outline: 2px solid #ffb3b8;
+  outline-offset: -5px;
+}
+
+.shop__sell-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  line-height: 1;
+}
+
+.shop__sell-label b {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.shop__sell-label small {
+  font-size: 9px;
+  color: #ffd6d9;
+}
+
+.shop__sell .shop__coin {
+  width: 12px;
+  height: 12px;
+  filter: drop-shadow(0 1px 0 #5a0a12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop__meter-bar i.is-on {
+    animation: none;
+  }
+}
+
+/* Tükendi */
+.shop__buy.shop__buy--soldout {
+  cursor: not-allowed;
+  color: #ff9a9a;
+  background: transparent;
+  box-shadow: none;
+  border: 2px dashed rgba(255, 120, 120, 0.5);
+}
+
+/* ================================================================ My Collection: oyuncak gibi gümüş çerçeve */
+.collection__panel--silver {
+  position: relative;
+  border: 5px solid transparent;
+  border-radius: 22px;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(190, 198, 216, 0.13), transparent 70%) padding-box,
+    radial-gradient(80% 50% at 100% 100%, rgba(120, 110, 170, 0.12), transparent 70%) padding-box,
+    linear-gradient(180deg, #22232c 0%, #1a1a22 45%, #13131a 100%) padding-box,
+    linear-gradient(165deg, #f7f8fc 0%, #cfd3dc 16%, #8e94a3 40%, #e2e5ec 60%, #959cab 80%, #cdd1da 100%) border-box;
+  box-shadow:
+    inset 0 0 0 1px #2a2d38,
+    inset 0 2px 0 1px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 3px rgba(255, 255, 255, 0.035),
+    0 0 0 1px #2c2f3a,
+    0 6px 0 #5f6574,
+    0 7px 0 1px #2a2d38,
+    0 28px 60px rgba(0, 0, 0, 0.45);
+}
+
+/* Köşe perçinleri: küçük parlak gümüş düğmeler */
+.collection__panel--silver::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  pointer-events: none;
+  --stud: radial-gradient(circle at 35% 30%, #ffffff 0 1px, #d6dae3 1.5px, #8b919f 3px, #4a4f5c 4px, transparent 4.5px);
+  background:
+    var(--stud) left top / 10px 10px no-repeat,
+    var(--stud) right top / 10px 10px no-repeat,
+    var(--stud) left bottom / 10px 10px no-repeat,
+    var(--stud) right bottom / 10px 10px no-repeat;
+}
+
+/* Üst kenarda ince parlama: cilalı metal hissi */
+.collection__panel--silver::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 30px;
+  right: 30px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.9), transparent);
+}
+
+.collection__panel--silver p.collection__sub,
+.collection__panel--silver .shop__msg {
+  color: #8f94a3;
+}
+
+.collection__panel--silver .collection__title {
+  color: #e4e7ee;
+  background: linear-gradient(180deg, #ffffff 0%, #d7dbe4 45%, #9aa1b0 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 0 #3a3e4a);
+}
+
+/* ================================================================ Market: oyuncak gibi Antique Brass çerçeve */
+.collection__panel--brass {
+  position: relative;
+  border: 5px solid transparent;
+  border-radius: 22px;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(214, 178, 110, 0.15), transparent 70%) padding-box,
+    radial-gradient(80% 50% at 100% 100%, rgba(130, 100, 160, 0.12), transparent 70%) padding-box,
+    linear-gradient(180deg, #2a2117 0%, #1f1912 45%, #17120d 100%) padding-box,
+    linear-gradient(165deg, #f4e4bd 0%, #d6b67c 16%, #9c7a45 40%, #e9d3a1 60%, #a4824d 80%, #cfae74 100%) border-box;
+  box-shadow:
+    inset 0 0 0 1px #352a1a,
+    inset 0 2px 0 1px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 3px rgba(255, 232, 190, 0.035),
+    0 0 0 1px #362a19,
+    0 6px 0 #7a5d34,
+    0 7px 0 1px #2f2414,
+    0 28px 60px rgba(0, 0, 0, 0.45);
+}
+
+/* Köşe perçinleri: küçük pirinç düğmeler */
+.collection__panel--brass::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  pointer-events: none;
+  --stud: radial-gradient(circle at 35% 30%, #fff8e6 0 1px, #e9d3a1 1.5px, #a8854f 3px, #5a4424 4px, transparent 4.5px);
+  background:
+    var(--stud) left top / 10px 10px no-repeat,
+    var(--stud) right top / 10px 10px no-repeat,
+    var(--stud) left bottom / 10px 10px no-repeat,
+    var(--stud) right bottom / 10px 10px no-repeat;
+}
+
+.collection__panel--brass::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 30px;
+  right: 30px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 244, 214, 0.9), transparent);
+}
+
+.collection__panel--brass > .collection__head .collection__title:not(.collection__title--small) {
+  background: linear-gradient(180deg, #fff6dc 0%, #ead29c 45%, #b08d57 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 0 #4a3820);
+}
+
+.collection__panel--brass h2.collection__title--small {
+  color: #e3c78d;
+}
+
+.collection__panel--brass p.collection__sub,
+.collection__panel--brass .shop__msg {
+  color: #9e8a68;
+}
+
+.collection__panel--brass .shop__subhead {
+  border-top-color: rgba(214, 182, 124, 0.14);
+}
+
+/* İlk alt başlık (Hamsters): üstünde çizgi yok */
+.shop__subhead--first {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.shop__subhead {
+  scroll-margin-top: calc(var(--nav-height) + var(--nav-top) + 24px);
+}
+
+/* Sağ üst: ürün türleri (Hamster | Pixsy), tıklanabilir piksel sekmeler */
+.market__types {
+  display: flex;
+  flex-wrap: wrap;
+  max-width: 100%;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: #1e1811;
+  box-shadow:
+    inset 0 0 0 1px rgba(214, 182, 124, 0.3),
+    0 3px 0 #2a2014;
+  clip-path: polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px);
+}
+
+.market__type {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border: 0;
+  font-family: var(--pixel-font);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #f7e9c6;
+  background: linear-gradient(180deg, #5a4628, #43341d);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 205, 0.22),
+    inset 0 0 0 1px rgba(214, 182, 124, 0.38);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.1s;
+}
+
+.market__type:hover {
+  color: #2a1f10;
+  background: linear-gradient(180deg, #f4e4bd, #cfae74);
+}
+
+.market__type:active {
+  transform: translateY(1px);
+}
+
+.market__type:focus-visible {
+  outline: 2px solid #e9d3a1;
+  outline-offset: 2px;
+}
+
+.market__type-count {
+  min-width: 22px;
+  padding: 3px 6px;
+  font-size: 11px;
+  line-height: 1;
+  text-align: center;
+  color: #2a1f10;
+  background: #e3c78d;
+  box-shadow: 0 2px 0 #7a5d34;
+}
+
+.market__type:hover .market__type-count {
+  color: #f7e9c6;
+  background: #6b5230;
+  box-shadow: 0 2px 0 #3a2c17;
+}
+
+.market__type-sep {
+  width: 2px;
+  height: 18px;
+  background: rgba(214, 182, 124, 0.32);
+}
+
+/* ================================================================ Kompakt kartlar: My Collection + Market
+ * Kartlar 0.86 ölçekte (240 → ~206 px); her panel tek satır, sağa kayan şerit.
+ * zoom kartın tüm iç ölçülerini (görsel, yazı, efektler) birlikte küçültür. */
+.collection__panel .card {
+  zoom: 0.86;
+}
+
+.collection__panel {
+  gap: 18px;
+}
+
+.collection__panel .collection__grid > .shop__slot,
+.collection__panel .collection__grid--row > .shop__slot {
+  width: 206px;
+}
+
+.collection__panel .shop__grid {
+  grid-template-columns: repeat(auto-fill, 206px);
+  gap: 22px 22px;
+}
+
+.collection__panel .collection__grid--row {
+  gap: 22px;
+  padding-top: 6px;
+  padding-bottom: 12px;
+}
+
+/* Satır başlıkları: küçük ve sıkı */
+.collection__panel .shop__subhead {
+  margin-top: 6px;
+  padding-top: 14px;
+}
+
+.collection__head + .collection__rowhead {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.collection__panel h2.collection__title--small {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+
+.collection__panel .shop__slot {
+  gap: 9px;
+}
+
+/* Kart altı butonları: dar karta göre, yazı her zaman tek satır ("Run with Infernoksy" dahil) */
+.collection__panel .shop__buy {
+  gap: 6px;
+  min-height: 38px;
+  padding: 8px 6px 10px;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.collection__panel .shop__buy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.collection__panel .shop__buy .shop__coin,
+.collection__panel .shop__buy .shop__check,
+.collection__panel .shop__buy .shop__plus,
+.collection__panel .shop__buy .shop__play {
+  flex: none;
+  scale: 0.85;
+}
+
+.collection__panel .panel p.shop__msg,
+.collection__panel p.shop__msg {
+  margin-top: -2px;
+  font-size: 8px;
+}
+
+/* Limited sayacı | Sell: dar karta sığsın */
+.collection__panel .shop__meter {
+  gap: 5px;
+  padding: 6px 7px 7px;
+}
+
+.collection__panel .shop__meter-tag {
+  gap: 4px;
+  font-size: 7px;
+}
+
+.collection__panel .shop__meter-gem {
+  width: 6px;
+  height: 6px;
+}
+
+.collection__panel .shop__meter-count {
+  font-size: 7px;
+}
+
+.collection__panel .shop__meter-count b {
+  font-size: 10px;
+}
+
+.collection__panel .shop__meter-bar {
+  height: 7px;
+  gap: 1px;
+}
+
+.collection__panel .shop__sell {
+  gap: 5px;
+  min-width: 56px;
+  padding: 6px 7px;
+}
+
+.collection__panel .shop__sell-label b {
+  font-size: 10px;
+}
+
+.collection__panel .shop__sell-label small {
+  font-size: 7px;
+}
+
+.collection__panel .shop__sell .shop__coin {
+  width: 9px;
+  height: 9px;
+}
+
+/* İsimli butonlar ("Run with Infernoksy", "Put on BTC Pixsy"): tam yazı tek satıra sığsın */
+.collection__panel .shop__buy--wear {
+  gap: 4px;
+  padding-left: 4px;
+  padding-right: 4px;
+  letter-spacing: 0.02em;
+}
+
+.collection__panel .shop__buy--wear span {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+/* Market: seçili tür düğmesi + kısa bilgi satırı */
+.market__type.is-on {
+  color: #2a1f10;
+  background: linear-gradient(180deg, #f4e4bd, #cfae74);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 0 0 1px #7a5d34;
+}
+
+.market__type.is-on .market__type-count {
+  color: #f7e9c6;
+  background: #6b5230;
+  box-shadow: 0 2px 0 #3a2c17;
+}
+
+.collection__panel p.market__hint {
+  margin-top: -10px;
+}
+
+/* ================================================================ MYTHIC: cennet ışığı (Seraphoksy)
+ * Süt beyazı + inci + açık altın çerçeve, prizma gibi akan yüzey, dönen beyaz ışık hüzmeleri,
+ * nefes alan beyaz-altın hale. Legendary'den bir kademe daha görkemli. */
+.legend--mythic {
+  color: #fff2c4;
+}
+
+.gem--mythic {
+  width: 14px;
+  height: 14px;
+  background: linear-gradient(135deg, #ffffff 0%, #fff1c8 45%, #d9ccff 100%);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  filter: drop-shadow(0 0 4px rgba(255, 246, 220, 0.95)) drop-shadow(0 0 8px rgba(200, 180, 255, 0.6));
+}
+
+.card--mythic {
+  /* Opal / sedef prizma: birkaç renk çerçevede yavaşça akar (kartın değeri bir bakışta okunsun) */
+  --frame: linear-gradient(
+    120deg,
+    #ffffff 0%,
+    #ff8fd2 10%,
+    #a07dff 22%,
+    #4fc8ff 34%,
+    #6ff0b8 46%,
+    #ffcc3a 58%,
+    #ff7ec8 70%,
+    #8f72ff 82%,
+    #5ce6ff 92%,
+    #ffffff 100%
+  );
+  --panel: linear-gradient(180deg, #2c2556, #19143c 70%, #221b48);
+  --edge: rgba(230, 210, 255, 0.5);
+  --accent: #fff2c4;
+  --name: #ffffff;
+  --art-edge: #e9dcff;
+  --art-bg:
+    linear-gradient(transparent 72%, #3b3274 72%, #2a235a),
+    radial-gradient(90% 85% at 50% 58%, #ffffff 0%, #fff0c4 24%, #f2c9ff 44%, #b9a6ff 62%, #3d327e 88%);
+  --shadow:
+    0 0 0 1px #ffffff,
+    0 0 26px rgba(255, 180, 230, 0.5),
+    0 0 60px rgba(140, 210, 255, 0.35),
+    0 18px 36px rgba(0, 0, 0, 0.55);
+}
+
+/* Çerçeve: dairesel (conic) opal geçiş kartın etrafında sürekli döner.
+ * Dairenin başı ve sonu aynı noktada buluştuğu için hiç dikiş / başa sarma sıçraması olmaz. */
+@property --mythic-spin {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.card--mythic .card__inner {
+  background: conic-gradient(
+    from var(--mythic-spin),
+    #ffffff,
+    #ff8fd2,
+    #a07dff,
+    #4fc8ff,
+    #6ff0b8,
+    #ffcc3a,
+    #ff7ec8,
+    #8f72ff,
+    #5ce6ff,
+    #ffffff
+  );
+  animation:
+    mythic-spin 9s linear infinite,
+    mythic-aura 4.5s ease-in-out infinite;
+}
+
+@keyframes mythic-spin {
+  to {
+    --mythic-spin: 360deg;
+  }
+}
+
+/* Kart adı: tekrar eden geçiş tam bir desen kadar kayar → kesintisiz akış */
+.card--mythic .card__name {
+  background: linear-gradient(90deg, #ffffff, #ffd6f0, #d6c8ff, #b8f0ff, #fff1c4, #ffffff) 0 0 / 50% 100% repeat-x;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: mythic-name-flow 4.5s linear infinite;
+}
+
+@keyframes mythic-name-flow {
+  to {
+    background-position: 100% 0;
+  }
+}
+
+.card--mythic .card__glare {
+  display: block;
+  background: radial-gradient(circle at var(--mx) var(--my), rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 50%);
+  mix-blend-mode: overlay;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+/* Prizma gibi akan inci folyo */
+.card--mythic .card__foil {
+  display: block;
+  background:
+    linear-gradient(125deg, #ffffff, #ff8fd2, #a07dff, #4fc8ff, #6ff0b8, #ffcc3a, #ffffff),
+    repeating-linear-gradient(60deg, transparent 0 6px, rgba(255, 255, 255, 0.22) 7px, transparent 9px 16px);
+  background-size:
+    300% 300%,
+    200% 200%;
+  background-position: var(--mx) var(--my);
+  mix-blend-mode: soft-light;
+  opacity: 0.65;
+  animation: holo-shift 7s ease-in-out infinite alternate;
+}
+
+.card--mythic:hover .card__foil,
+.card--mythic.is-active .card__foil {
+  opacity: calc(0.75 + var(--hyp) * 0.25);
+}
+
+/* Dönen beyaz ışık hüzmeleri + yumuşak hale */
+.card--mythic .card__art-bg::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  width: 340px;
+  height: 340px;
+  translate: -50% -50%;
+  background: repeating-conic-gradient(rgba(255, 255, 255, 0.34) 0 7deg, transparent 7deg 18deg);
+  -webkit-mask: radial-gradient(circle, #000 18%, transparent 62%);
+  mask: radial-gradient(circle, #000 18%, transparent 62%);
+  animation: rays-spin 30s linear infinite;
+}
+
+.card--mythic .card__art-bg::after {
+  content: '';
+  position: absolute;
+  inset: 72% 0 0;
+  background: linear-gradient(#3b3274, #2a235a);
+}
+
+.card--mythic .card__sparkles i {
+  background: #ffffff;
+  box-shadow:
+    0 -3px 0 #fff2c4,
+    0 3px 0 #fff2c4,
+    -3px 0 0 #e2d6ff,
+    3px 0 0 #e2d6ff;
+}
+
+@keyframes mythic-aura {
+  /* Işıma da renk değiştirerek nefes alır: pembe → camgöbeği → lavanta */
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px #ffffff, 0 0 24px rgba(255, 180, 230, 0.5), 0 0 60px rgba(140, 210, 255, 0.3), 0 18px 36px rgba(0, 0, 0, 0.55);
+  }
+  33% {
+    box-shadow: 0 0 0 1px #ffffff, 0 0 40px rgba(140, 220, 255, 0.75), 0 0 90px rgba(190, 160, 255, 0.4), 0 18px 36px rgba(0, 0, 0, 0.55);
+  }
+  66% {
+    box-shadow: 0 0 0 1px #ffffff, 0 0 40px rgba(200, 170, 255, 0.75), 0 0 90px rgba(255, 220, 140, 0.35), 0 18px 36px rgba(0, 0, 0, 0.55);
+  }
+}
+
+.shop__row--mythic {
+  box-shadow: inset 0 0 0 1px rgba(255, 242, 196, 0.5);
+}
+
+.shop__foot--mythic {
+  --accent: #fff2c4;
+  --accent-dim: rgba(255, 242, 196, 0.16);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card--mythic .card__inner,
+  .card--mythic .card__name,
+  .card--mythic .card__foil,
+  .card--mythic .card__art-bg::before {
+    animation: none;
+  }
+}
+
+/* Telefon: Market türü sekmeleri tek satır (temel kurallardan sonra gelmeli) */
+@media (max-width: 720px) {
+  .market__types {
+    flex-wrap: nowrap;
+  }
+  .market__type {
+    gap: 8px;
+    padding: 9px 12px;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+  }
+  .market__type-sep {
+    display: none;
+  }
+}

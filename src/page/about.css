@@ -1,0 +1,376 @@
+/* ================================================================ About: buz mavisi, tek ekranlık tanıtım */
+.about {
+  --ice: #8fdcf5;
+  --ice-hi: #d8f4ff;
+  --ice-deep: #1c3a52;
+  --ice-text: #eaf7ff;
+  --ice-soft: #a9c7da;
+  --notch: polygon(4px 0, calc(100% - 4px) 0, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 0 calc(100% - 4px), 0 4px);
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 48px 52px 44px;
+  border: 5px solid transparent;
+  border-radius: 22px;
+  background:
+    radial-gradient(70% 55% at 78% 30%, rgba(143, 220, 245, 0.2), transparent 70%) padding-box,
+    radial-gradient(60% 50% at 10% 0%, rgba(120, 140, 230, 0.16), transparent 70%) padding-box,
+    linear-gradient(180deg, #1b3550 0%, #15283f 55%, #101d30 100%) padding-box,
+    linear-gradient(165deg, #f2fbff 0%, #b8e6f6 18%, #6fb3d2 42%, #dff5fd 62%, #79bcd9 82%, #b4e2f3 100%) border-box;
+  box-shadow:
+    inset 0 0 0 1px #1a3348,
+    inset 0 2px 0 1px rgba(0, 0, 0, 0.4),
+    0 0 0 1px #1d3346,
+    0 6px 0 #4d86a3,
+    0 7px 0 1px #1a2c3c,
+    0 28px 60px rgba(0, 0, 0, 0.45);
+}
+
+/* Köşe perçinleri + üst parlama (diğer panellerle aynı aile) */
+.about::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  pointer-events: none;
+  --stud: radial-gradient(circle at 35% 30%, #ffffff 0 1px, #c9ecf8 1.5px, #6fa8c4 3px, #24465c 4px, transparent 4.5px);
+  background:
+    var(--stud) left top / 10px 10px no-repeat,
+    var(--stud) right top / 10px 10px no-repeat,
+    var(--stud) left bottom / 10px 10px no-repeat,
+    var(--stud) right bottom / 10px 10px no-repeat;
+}
+
+/* --- Üst bölüm: vizyon + canlı sahne */
+.about__hero {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 24px;
+}
+
+.about__copy {
+  max-width: 640px;
+}
+
+.about__kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+  padding: 9px 16px 9px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #0f2233;
+  background: linear-gradient(180deg, var(--ice-hi), var(--ice));
+  box-shadow:
+    inset 0 -3px 0 rgba(30, 80, 110, 0.35),
+    0 3px 0 #2c5a75;
+  clip-path: var(--notch);
+}
+
+.about__kicker-star,
+.about__tag-star {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  background: var(--gold);
+  clip-path: var(--star-shape);
+  filter: drop-shadow(0 1px 0 #8a5a00);
+}
+
+.panel h2.about__title {
+  margin: 0 0 20px;
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1.14;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  color: var(--ice-text);
+  text-shadow: 0 4px 0 #0b1828;
+}
+
+.about__title em {
+  font-style: normal;
+  color: var(--ice);
+  text-shadow:
+    0 4px 0 #0b1828,
+    0 0 22px rgba(143, 220, 245, 0.35);
+}
+
+.panel p.about__lead {
+  max-width: 540px;
+  margin-bottom: 30px;
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 18px;
+  line-height: 1.6;
+  letter-spacing: 0;
+  color: var(--ice-soft);
+}
+
+.about__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 22px;
+}
+
+/* Ana buton: oyuna götürür */
+.about__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 26px 15px 20px;
+  font-family: var(--pixel-font);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: #0f2233;
+  background: linear-gradient(180deg, #ffffff, var(--ice-hi) 55%, #b6e6f7);
+  box-shadow:
+    inset 0 -4px 0 rgba(40, 100, 140, 0.3),
+    0 4px 0 #2c5a75,
+    0 10px 24px rgba(0, 0, 0, 0.3);
+  clip-path: var(--notch);
+  transition: transform 0.12s, filter 0.12s;
+}
+
+.about__cta:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+}
+
+.about__cta:active {
+  transform: translateY(1px);
+}
+
+.about__cta:focus-visible {
+  outline: 2px solid var(--ice-hi);
+  outline-offset: 3px;
+}
+
+.about__cta-play {
+  width: 12px;
+  height: 14px;
+  background: #e8a21a;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+
+.panel p.about__note {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #7f9fb4;
+}
+
+/* Canlı sahne (çark + bulut) */
+.about__stage {
+  position: relative;
+  justify-self: end;
+}
+
+.about__stage-canvas {
+  display: block;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 30px rgba(143, 220, 245, 0.12));
+}
+
+/* Sahnedeki yüzen rozet */
+.about__tag {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 13px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ice-text);
+  background: rgba(16, 32, 50, 0.85);
+  box-shadow:
+    inset 0 0 0 2px rgba(143, 220, 245, 0.45),
+    0 3px 0 #0b1828;
+  clip-path: var(--notch);
+  animation: about-bob 3.2s ease-in-out infinite;
+}
+
+@keyframes about-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+/* Piksel zemin: sahneyi alttaki sütunlardan ayırır */
+.about__ground {
+  position: relative;
+  z-index: 1;
+  height: 8px;
+  margin: 6px -52px 34px;
+  background:
+    linear-gradient(90deg, rgba(143, 220, 245, 0.55) 0 50%, transparent 50%) 0 0 / 8px 2px repeat-x,
+    linear-gradient(180deg, transparent 2px, rgba(143, 220, 245, 0.18) 2px, rgba(143, 220, 245, 0.05));
+}
+
+/* --- Üç sütun: Run / Collect / Belong */
+.about__pillars {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.about__pillar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 22px 24px;
+  background: linear-gradient(180deg, rgba(216, 244, 255, 0.09), rgba(216, 244, 255, 0.035));
+  box-shadow:
+    inset 0 0 0 2px rgba(143, 220, 245, 0.22),
+    inset 0 2px 0 rgba(255, 255, 255, 0.06),
+    0 4px 0 rgba(8, 18, 30, 0.6);
+  clip-path: var(--notch);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.about__pillar:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 0 0 2px rgba(143, 220, 245, 0.45),
+    inset 0 2px 0 rgba(255, 255, 255, 0.08),
+    0 7px 0 rgba(8, 18, 30, 0.6);
+}
+
+/* Sütunlar arası ince piksel bağlantı */
+.about__pillar:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -22px;
+  width: 22px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(143, 220, 245, 0.5) 0 50%, transparent 50%) 0 0 / 6px 2px repeat-x;
+}
+
+.about__pillar-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 92px;
+}
+
+.about__pillar-art {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.about__pillar h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px;
+  font-family: var(--pixel-font);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ice-text);
+}
+
+.about__num {
+  font-size: 11px;
+  color: var(--ice);
+  opacity: 0.8;
+}
+
+.panel .about__pillar p {
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  letter-spacing: 0;
+  color: var(--ice-soft);
+}
+
+/* --- Dar ekranlar: sadece bozulmasın */
+@media (max-width: 1100px) {
+  .about__hero {
+    grid-template-columns: 1fr;
+  }
+  .about__stage {
+    justify-self: center;
+  }
+  .about__pillars {
+    grid-template-columns: 1fr;
+  }
+  .about__pillar:not(:last-child)::after {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .about {
+    padding: 30px 20px 26px;
+  }
+  .about__pillar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .about__pillar-icon {
+    width: auto;
+    height: auto;
+  }
+  .panel h2.about__title {
+    font-size: 26px;
+    white-space: normal;
+  }
+  .panel p.about__lead {
+    font-size: 16px;
+  }
+  .about__ground {
+    margin: 6px -20px 24px;
+  }
+  /* Sahne tam genişlik: canvas ekranı doldurur, rozet üstünde durur (üstüne binmez) */
+  .about__stage {
+    justify-self: stretch;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+  .about__tag {
+    position: static;
+    white-space: nowrap;
+  }
+  .about__stage-canvas {
+    width: 100% !important;
+    max-width: 450px;
+    height: auto !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .about__tag {
+    animation: none;
+  }
+}
