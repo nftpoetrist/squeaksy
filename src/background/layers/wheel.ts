@@ -3,7 +3,8 @@ import { hex } from '../util/color';
 import { clamp, TAU } from '../util/math';
 import { createCanvas, drawCentered, glowSprite, plotLine, RectBatch, type Canvas2D } from '../util/pixel';
 
-const C = {
+/** Çark renkleri: varsayılan altın çark (oyun). About'taki Squeekchain çarkı kendi paletini verir. */
+export const GOLD_WHEEL = {
   outline: '#5a3010',
   hi: '#ffe07a',
   lo: '#e0a040',
@@ -22,7 +23,11 @@ const C = {
   plate: '#3a2f70',
   plateHi: '#5a4a9a',
   trim: '#f0b040',
+  /** Jant ışığı + kıvılcım */
+  glow: '#ffc85a',
+  spark: '#ffae42',
 };
+export type WheelPalette = typeof GOLD_WHEEL;
 
 /** Çarkın ekrandaki (CSS piksel) geometrisi: oyun katmanı hamsteri buna göre yerleştirir. */
 export interface WheelGeometry {
@@ -43,6 +48,8 @@ export interface WheelGeometry {
  * Statik parçalar önbelleğe alınır; her karede sadece dönen parçalar çizilir.
  */
 export class WheelLayer {
+  constructor(private readonly C: WheelPalette = GOLD_WHEEL) {}
+
   private back: Canvas2D | null = null;
   private hub: Canvas2D | null = null;
   private front: Canvas2D | null = null;
@@ -85,7 +92,7 @@ export class WheelLayer {
     this.paintFront();
     this.paintHub();
     this.aura = this.auraSprite(R, u);
-    this.light = glowSprite(3 * u + 1, hex('#ffc85a'), 0.9, 4, 1.2);
+    this.light = glowSprite(3 * u + 1, hex(this.C.glow), 0.9, 4, 1.2);
     this.plateLight = glowSprite(2.5 * u + 1, hex('#7ef9ff'), 0.8, 3, 1.2);
     this.plateNodes = [];
     const n = 5;
@@ -131,16 +138,16 @@ export class WheelLayer {
         legsHi.add(dir < 0 ? x - 1 : x + 1, y, 1, 1);
       });
     }
-    legs.flush(ctx, C.steel);
-    legsHi.flush(ctx, C.steelHi);
+    legs.flush(ctx, this.C.steel);
+    legsHi.flush(ctx, this.C.steelHi);
     const px = cx - (plateW >> 1);
-    ctx.fillStyle = C.steelDeep;
+    ctx.fillStyle = this.C.steelDeep;
     ctx.fillRect(px - 1, gy - 3, plateW + 2, 6);
-    ctx.fillStyle = C.plate;
+    ctx.fillStyle = this.C.plate;
     ctx.fillRect(px, gy - 3, plateW, 4);
-    ctx.fillStyle = C.plateHi;
+    ctx.fillStyle = this.C.plateHi;
     ctx.fillRect(px, gy - 3, plateW, 1);
-    ctx.fillStyle = C.trim;
+    ctx.fillStyle = this.C.trim;
     ctx.fillRect(px + 2, gy, plateW - 4, 1);
 
     // Arka jant (derinlik)
@@ -152,8 +159,8 @@ export class WheelLayer {
     this.ring(back, bx, by, R - 1);
     this.ring(back, bx, by, R - 2);
     this.ring(backDeep, bx, by, R - 3);
-    backDeep.flush(ctx, C.backDeep);
-    back.flush(ctx, C.back);
+    backDeep.flush(ctx, this.C.backDeep);
+    back.flush(ctx, this.C.back);
   }
 
   private paintFront(): void {
@@ -176,12 +183,12 @@ export class WheelLayer {
     this.ring(shade, cx, cy, R - t + 2);
     this.ring(lip, cx, cy, R - t + 1);
     this.ring(outline, cx, cy, R - t);
-    outline.flush(ctx, C.outline);
-    lo.flush(ctx, C.lo);
-    mid.flush(ctx, C.mid);
-    hi.flush(ctx, C.hi);
-    shade.flush(ctx, C.shade);
-    lip.flush(ctx, C.lip);
+    outline.flush(ctx, this.C.outline);
+    lo.flush(ctx, this.C.lo);
+    mid.flush(ctx, this.C.mid);
+    hi.flush(ctx, this.C.hi);
+    shade.flush(ctx, this.C.shade);
+    lip.flush(ctx, this.C.lip);
 
   }
 
@@ -202,12 +209,12 @@ export class WheelLayer {
     }
     this.ring(hubHi, c, c, hubR, (s) => s < 0);
     this.ring(outline, c, c, hubR + 1);
-    outline.flush(ctx, C.outline);
-    hub.flush(ctx, C.shade);
-    hubHi.flush(ctx, C.mid);
-    ctx.fillStyle = C.lip;
+    outline.flush(ctx, this.C.outline);
+    hub.flush(ctx, this.C.shade);
+    hubHi.flush(ctx, this.C.mid);
+    ctx.fillStyle = this.C.lip;
     ctx.fillRect(c - 1, c - 1, 3, 3);
-    ctx.fillStyle = C.hi;
+    ctx.fillStyle = this.C.hi;
     ctx.fillRect(c, c, 1, 1);
   }
 
@@ -218,7 +225,7 @@ export class WheelLayer {
     const g = createCanvas(size, size);
     const img = g.ctx.createImageData(size, size);
     const d = img.data;
-    const col = hex('#ffae42');
+    const col = hex(this.C.spark);
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         const dist = Math.abs(Math.hypot(x - c, y - c) - R) / pad;
@@ -308,8 +315,8 @@ export class WheelLayer {
       const target = k % 2 === 0 ? this.spokesHi : this.spokes;
       plotLine(bx, by, bx + Math.cos(a) * (R - 3), by + Math.sin(a) * (R - 3), (x, y) => target.add(x, y));
     }
-    this.spokes.flush(ctx, C.spoke);
-    this.spokesHi.flush(ctx, C.spokeHi);
+    this.spokes.flush(ctx, this.C.spoke);
+    this.spokesHi.flush(ctx, this.C.spokeHi);
     if (this.hub) drawCentered(ctx, this.hub.canvas, bx, by);
     for (let k = 0; k < this.rungCount; k++) {
       const a = this.rot + (k * TAU) / this.rungCount;
@@ -318,8 +325,8 @@ export class WheelLayer {
       const target = sin > 0.2 || cos < -0.6 ? this.rungsHi : this.rungs;
       plotLine(cx + cos * (R - t + 1), cy + sin * (R - t + 1), bx + cos * (R - 1), by + sin * (R - 1), (x, y) => target.add(x, y, 1, 1));
     }
-    this.rungs.flush(ctx, C.rung);
-    this.rungsHi.flush(ctx, C.rungHi);
+    this.rungs.flush(ctx, this.C.rung);
+    this.rungsHi.flush(ctx, this.C.rungHi);
 
     inside?.();
     ctx.drawImage(this.front.canvas, dx, dy);
@@ -330,7 +337,7 @@ export class WheelLayer {
       const a = this.rot + k * segA;
       plotLine(cx + Math.cos(a) * R, cy + Math.sin(a) * R, cx + Math.cos(a) * (R - t + 2), cy + Math.sin(a) * (R - t + 2), (x, y) => this.notches.add(x, y));
     }
-    this.notches.flush(ctx, C.outline);
+    this.notches.flush(ctx, this.C.outline);
 
     // Segment ışıkları: çark hızlandıkça parlar
     ctx.globalCompositeOperation = 'lighter';

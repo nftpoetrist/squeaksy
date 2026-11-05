@@ -11,7 +11,7 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 48px 52px 44px;
+  padding: 60px 64px 56px;
   border: 5px solid transparent;
   border-radius: 22px;
   background:
@@ -219,7 +219,7 @@
   position: relative;
   z-index: 1;
   height: 8px;
-  margin: 6px -52px 34px;
+  margin: 6px -64px 40px;
   background:
     linear-gradient(90deg, rgba(143, 220, 245, 0.55) 0 50%, transparent 50%) 0 0 / 8px 2px repeat-x,
     linear-gradient(180deg, transparent 2px, rgba(143, 220, 245, 0.18) 2px, rgba(143, 220, 245, 0.05));
@@ -284,6 +284,20 @@
   image-rendering: pixelated;
 }
 
+/* İkon her zaman kutusunun içinde ve tam ortada: uzun ikon taşmaz, küçülerek sığar */
+.about__pillar-icon {
+  position: relative;
+}
+
+.about__pillar-icon .about__pillar-art {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
+  object-position: center;
+}
+
 .about__pillar h3 {
   display: flex;
   align-items: center;
@@ -311,6 +325,185 @@
   color: var(--ice-soft);
 }
 
+/* --- Alt bölüm: Squeekchain bulutu (sahne solda, yazı sağda) */
+.about__ground--chain {
+  margin-top: 46px;
+}
+
+.about__hero--chain {
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 40px;
+}
+
+.about__chain {
+  position: relative;
+  z-index: 1;
+}
+
+/* Kendi tonu: ayraçtan panelin dibine kadar derin deniz mavisi + cyan parıltı (Gerçek Bulut'un rengi) */
+.about__chain::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -40px -64px -56px;
+  pointer-events: none;
+  background:
+    radial-gradient(40% 40% at 20% 28%, rgba(63, 200, 232, 0.2), transparent 70%),
+    radial-gradient(40% 35% at 92% 6%, rgba(126, 249, 255, 0.08), transparent 70%),
+    linear-gradient(180deg, #0f2a3e 0%, #0c2236 60%, #0a1b2c 100%);
+}
+
+.about__ground--inner {
+  margin-top: 30px;
+  background:
+    linear-gradient(90deg, rgba(63, 200, 232, 0.55) 0 50%, transparent 50%) 0 0 / 8px 2px repeat-x,
+    linear-gradient(180deg, transparent 2px, rgba(63, 200, 232, 0.18) 2px, rgba(63, 200, 232, 0.05));
+}
+
+/* Squeekchain sütunları: aynı kart, cyan çerçeve */
+.about__pillars--chain .about__pillar {
+  background: linear-gradient(180deg, rgba(63, 200, 232, 0.12), rgba(63, 200, 232, 0.035));
+  box-shadow:
+    inset 0 0 0 2px rgba(63, 200, 232, 0.3),
+    inset 0 2px 0 rgba(255, 255, 255, 0.06),
+    0 4px 0 rgba(4, 14, 24, 0.7);
+}
+
+.about__pillars--chain .about__pillar:hover {
+  box-shadow:
+    inset 0 0 0 2px rgba(126, 249, 255, 0.55),
+    inset 0 2px 0 rgba(255, 255, 255, 0.08),
+    0 7px 0 rgba(4, 14, 24, 0.7);
+}
+
+.about__pillars--chain .about__pillar:not(:last-child)::after {
+  background: linear-gradient(90deg, rgba(63, 200, 232, 0.6) 0 50%, transparent 50%) 0 0 / 6px 2px repeat-x;
+}
+
+.about__pillars--chain .about__num {
+  color: #7ef9ff;
+}
+
+.about__hero--chain .about__copy {
+  justify-self: end;
+}
+
+.about__stage--chain {
+  justify-self: start;
+}
+
+.about__stage--chain .about__stage-canvas {
+  filter: drop-shadow(0 0 30px rgba(63, 200, 232, 0.16));
+}
+
+.about__tag--chain {
+  right: auto;
+  left: 6px;
+  animation-delay: -1.6s;
+}
+
+.about__kicker--chain {
+  background: linear-gradient(180deg, #c8f8ff, #3fc8e8);
+}
+
+.about__kicker-dot,
+.about__tag-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  background: #7ef9ff;
+  box-shadow: 0 0 0 2px #0c3a5a, 0 0 10px #7ef9ff;
+  animation: about-live 1.6s steps(2, jump-none) infinite;
+}
+
+.about__kicker-dot {
+  background: #0c3a5a;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
+}
+
+@keyframes about-live {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* --- Geniş ekranlar: iki yarı (Squeaksy, Squeekchain) ayrı ayrı tek ekrana sığar.
+   Sahne yüksekliği ekran boyuna göre ölçeklenir; yazı ve kartlar kısa ekranlarda sıkılaşır. */
+@media (min-width: 1101px) {
+  .about {
+    --stage-h: clamp(250px, calc(100svh - 385px), 440px);
+    padding: 44px 60px 44px;
+  }
+  .about__stage-canvas {
+    width: auto !important;
+    height: var(--stage-h) !important;
+  }
+  .about__ground {
+    margin: 4px -60px 26px;
+  }
+  .about__ground--chain {
+    margin-top: 30px;
+  }
+  .about__chain::before {
+    inset: -26px -60px -44px;
+  }
+  .about__ground--inner {
+    margin-top: 22px;
+  }
+  .about__pillar {
+    padding: 16px 22px;
+  }
+  .about__pillar-icon {
+    height: 84px;
+  }
+}
+
+@media (min-width: 1101px) and (max-height: 860px) {
+  .about {
+    padding: 32px 56px 34px;
+  }
+  .about__kicker {
+    margin-bottom: 14px;
+  }
+  .panel h2.about__title {
+    margin-bottom: 14px;
+    font-size: 34px;
+  }
+  .panel p.about__lead {
+    margin-bottom: 20px;
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  .about__cta {
+    padding: 12px 22px 12px 18px;
+    font-size: 13px;
+  }
+  .about__ground {
+    margin: 2px -56px 18px;
+  }
+  .about__ground--chain {
+    margin-top: 22px;
+  }
+  .about__chain::before {
+    inset: -18px -56px -34px;
+  }
+  .about__ground--inner {
+    margin-top: 16px;
+  }
+  .about__pillar {
+    padding: 12px 18px;
+    gap: 16px;
+  }
+  .about__pillar-icon {
+    width: 86px;
+    height: 70px;
+  }
+  .panel .about__pillar p {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+}
+
 /* --- Dar ekranlar: sadece bozulmasın */
 @media (max-width: 1100px) {
   .about__hero {
@@ -318,6 +511,16 @@
   }
   .about__stage {
     justify-self: center;
+  }
+  .about__hero--chain {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .about__stage--chain {
+    justify-self: center;
+  }
+  .about__hero--chain .about__copy {
+    justify-self: stretch;
   }
   .about__pillars {
     grid-template-columns: 1fr;
@@ -337,8 +540,8 @@
     gap: 12px;
   }
   .about__pillar-icon {
-    width: auto;
-    height: auto;
+    width: 96px;
+    height: 84px;
   }
   .panel h2.about__title {
     font-size: 26px;
@@ -349,6 +552,18 @@
   }
   .about__ground {
     margin: 6px -20px 24px;
+  }
+  .about__ground--chain {
+    margin-top: 30px;
+  }
+  .about__chain::before {
+    inset: -24px -20px -26px;
+  }
+  .about__ground--inner {
+    margin-top: 24px;
+  }
+  .about__stage--chain {
+    justify-self: stretch;
   }
   /* Sahne tam genişlik: canvas ekranı doldurur, rozet üstünde durur (üstüne binmez) */
   .about__stage {
@@ -370,7 +585,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .about__tag {
+  .about__tag,
+  .about__kicker-dot,
+  .about__tag-dot {
     animation: none;
   }
 }

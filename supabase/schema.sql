@@ -462,21 +462,22 @@ security definer
 set search_path = public
 as $$
   with base as (
-    select p.id, p.x_handle, p.avatar_url, p.balance as stars,
+    select p.id, p.x_handle, p.avatar_url, p.balance as stars, p.created_at,
            2 + (select count(*)::integer from public.owned_cards o where o.user_id = p.id) as cards,
            p.active_hamster
     from public.profiles p
     where p.x_handle is not null
   ), ranked as (
     select b.*,
-           rank() over (order by case when p_kind = 'cards' then b.cards::bigint else b.stars end desc, b.stars desc) as rank,
+           -- Eşitlikte aynı numara yok: önce katılan önde (sonra kullanıcı adı), her oyuncunun tek bir sırası olur
+           row_number() over (order by case when p_kind = 'cards' then b.cards::bigint else b.stars end desc, b.stars desc, b.created_at, b.x_handle) as rank,
            count(*) over () as total
     from base b
   ), page as (
     select r.rank, r.x_handle, r.avatar_url, r.stars, r.cards, r.active_hamster, r.total, false as is_me
     from ranked r
-    order by r.rank, r.x_handle
-    limit greatest(1, least(p_size, 50)) offset (greatest(1, p_page) - 1) * greatest(1, least(p_size, 50))
+    order by r.rank
+    limit greatest(1, least(p_size, 100)) offset (greatest(1, p_page) - 1) * greatest(1, least(p_size, 100))
   )
   select q.* from (
     select * from page

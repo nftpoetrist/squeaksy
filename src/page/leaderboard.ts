@@ -14,7 +14,8 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
 }
 
 const fmt = new Intl.NumberFormat('en-US');
-const PAGE_SIZE = 8;
+/** Sayfa başına 100 oyuncu; panel büyümez, liste kendi içinde kayar */
+const PAGE_SIZE = 100;
 
 /* ------------------------------------------------------------------ Kürsü sahnesi (piksel) */
 /** 5×7 piksel rakam (kürsüdeki "1") */
@@ -239,8 +240,12 @@ export function mountLeaderboard(section: HTMLElement, backend: AuthBackend, sig
     return c;
   };
   thead.append(th('#'), th('Player'), th('Stars', 'star'), th('Cards', 'card'), th('Hamster', 'gem'));
+  const scroller = el('div', 'lb__scroll');
   const list = el('ol', 'lb__list');
-  board.append(thead, list);
+  scroller.append(list);
+  // Giriş yapan oyuncu bu sayfada değilse kendi satırı kayan listenin altında hep görünür
+  const pinned = el('ol', 'lb__list lb__list--pinned');
+  board.append(thead, scroller, pinned);
 
   const mine = el('aside', 'lb__mine');
   body.append(board, mine);
@@ -309,6 +314,7 @@ export function mountLeaderboard(section: HTMLElement, backend: AuthBackend, sig
     if (pages <= 1) return;
     const go = (p: number) => {
       state.page = Math.min(pages, Math.max(1, p));
+      scroller.scrollTop = 0;
       void load();
     };
     const from = Math.max(1, Math.min(state.page - 2, pages - 4));
@@ -334,8 +340,13 @@ export function mountLeaderboard(section: HTMLElement, backend: AuthBackend, sig
     tabStars.setAttribute('aria-selected', String(state.kind === 'stars'));
     tabCards.setAttribute('aria-selected', String(state.kind === 'cards'));
     list.replaceChildren();
-    const rows = state.data?.rows ?? [];
-    const me = state.data?.me ?? null;
+    pinned.replaceChildren();
+    // Her satır tek ve ardışık sıra numarası alır (eşit puanda iki "9." olmaz)
+    const base = (state.page - 1) * PAGE_SIZE;
+    const rows = (state.data?.rows ?? []).map((r, i) => ({ ...r, rank: base + i + 1 }));
+    const rawMe = state.data?.me ?? null;
+    const me = rawMe ? (rows.find((r) => r.handle === rawMe.handle) ?? rawMe) : null;
+    if (state.data) state.data.me = me;
     if (state.data?.partial) {
       // Tam sıralama henüz açık değil: oyuncu kendi satırını hemen görür
       const note = el('li', 'lb__empty lb__empty--note');
@@ -356,10 +367,10 @@ export function mountLeaderboard(section: HTMLElement, backend: AuthBackend, sig
     });
     // Giriş yapan oyuncu bu sayfada değilse: kendi satırı tablonun altına sabitlenir
     if (me && !rows.some((r) => r.handle === me.handle)) {
-      if (rows.length) list.append(el('li', 'lb__divider'));
+      if (rows.length) pinned.append(el('li', 'lb__divider'));
       const mineRow = rowEl(me, true);
       mineRow.classList.add('lb__row--pinned');
-      list.append(mineRow);
+      pinned.append(mineRow);
     }
     renderMine();
     renderPager();

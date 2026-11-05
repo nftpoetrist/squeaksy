@@ -683,6 +683,11 @@ body::after {
   gap: 12px;
 }
 
+/* Community: ikinci link satırı (Docs + Whitepaper) üsttekiyle aynı aralıkta */
+.footer__links + .footer__links {
+  margin-top: -4px;
+}
+
 .footer__label {
   font-size: 9px;
   letter-spacing: 0.24em;
@@ -785,6 +790,34 @@ body::after {
     linear-gradient(currentColor, currentColor) 0 50% / 100% 2px no-repeat;
   box-shadow: inset 0 0 0 2px currentColor;
   clip-path: polygon(25% 0, 75% 0, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0 75%, 0 25%);
+}
+
+/* Piksel açık kitap (docs): iki sayfa, ortada sırt, sayfalarda satırlar */
+.social--docs .social__icon {
+  width: 14px;
+  height: 11px;
+  background:
+    linear-gradient(#0e0c16, #0e0c16) 6px 1px / 2px 10px no-repeat,
+    linear-gradient(#0e0c16, #0e0c16) 2px 3px / 3px 1px no-repeat,
+    linear-gradient(#0e0c16, #0e0c16) 2px 6px / 3px 1px no-repeat,
+    linear-gradient(#0e0c16, #0e0c16) 9px 3px / 3px 1px no-repeat,
+    linear-gradient(#0e0c16, #0e0c16) 9px 6px / 3px 1px no-repeat,
+    currentColor;
+  clip-path: polygon(0 0, 43% 9%, 57% 9%, 100% 0, 100% 91%, 57% 100%, 43% 100%, 0 91%);
+}
+
+/* Piksel sayfa (whitepaper): kıvrık köşe + metin satırları */
+.social--paper .social__icon {
+  width: 10px;
+  height: 13px;
+  background:
+    linear-gradient(#0e0c16, #0e0c16) 2px 5px / 6px 1px no-repeat,
+    linear-gradient(#0e0c16, #0e0c16) 2px 8px / 6px 1px no-repeat,
+    linear-gradient(#0e0c16, #0e0c16) 2px 11px / 4px 1px no-repeat,
+    linear-gradient(#0e0c16, #0e0c16) 6px 0 / 1px 4px no-repeat,
+    linear-gradient(#0e0c16, #0e0c16) 6px 3px / 4px 1px no-repeat,
+    currentColor;
+  clip-path: polygon(0 0, 70% 0, 100% 30%, 100% 100%, 0 100%);
 }
 
 /* Alt satır: piksel kesik çizgi, üstünde uyuyan Squeaksy */
@@ -2070,7 +2103,9 @@ body::after {
 }
 
 .social--discord .social__icon,
-.social--github .social__icon {
+.social--github .social__icon,
+.social--docs .social__icon,
+.social--paper .social__icon {
   background-color: currentColor;
 }
 
