@@ -57,7 +57,7 @@ VITE_SUPABASE_ANON_KEY=<anon public anahtarı>
 | `set_active_hamster()` | Koşan hamsteri değiştirir (sadece sahip olunan) |
 | `set_equipped_item()` | Pixsy tak / çıkar |
 | `card_supply()` | Market'teki Limited sayacı (herkese açık, sadece sayılar) |
-| `leaderboard()` | Overall (yıldız) ve Top Collectors (kart) sıralaması (herkese açık) |
+| `leaderboard()` | Overall (yıldız) ve Top Collectors (kart) sıralaması (herkese açık). Sayfa başına en fazla 100 oyuncu; her oyuncunun tekil sırası var (eşitlikte önce katılan önde) |
 
 ### Kartlar ve ekonomi
 
