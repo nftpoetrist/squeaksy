@@ -1,7 +1,9 @@
 # Squeekchain Live: mimari
 
-Durum (2026-11-05): Faz 1 + Faz 2 uygulandı, yerelde test edildi, **canlıya alınmadı** (dal `feature/squeekchain-live`).
-Doğrulama: canlı API ve Squeekchain'in kendi istemci şeması; sunucu PGlite'ta 62 testle; istemci sahte zincirle ekran görüntüleriyle.
+Durum (2026-11-06): Faz 1 + Faz 2 **canlıda** (squeaksy.xyz, commit 76855d2 ve 81a247f).
+Supabase tarafı 2026-11-05'te kuruldu (`pg_cron` + `pg_net`, `schema.sql` çalıştırıldı); zamanlayıcının 30 sn'de bir okuduğu doğrulandı,
+`last_error` boş; ödüller açık (`chain_config.rewards_enabled = true`). İlk gerçek inişte dağıtım `chain_settlements` üzerinden kontrol edilecek.
+Doğrulama: canlı API ve Squeekchain'in kendi istemci şeması; sunucu PGlite'ta 66 test + ilk okuma testiyle; istemci sahte zincir ve gerçek veriyle, ekran görüntüleriyle.
 
 Uygulamada tasarımdan farklar:
 - Ayrı rozet yerine **Gerçek Bulut**: çark bulutunun solunda camgöbeği bir bulut, çark bulutuna zincirle bağlı. Etiket bulutun altında
