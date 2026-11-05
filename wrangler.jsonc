@@ -1,0 +1,9 @@
+// Cloudflare Workers (statik site): `npm run build` çıktısı dist/ olduğu gibi yayınlanır.
+// Sunucu kodu yok; oyunun arka ucu Supabase'de.
+{
+  "name": "squeaksy",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist"
+  }
+}
