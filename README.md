@@ -27,6 +27,10 @@ Without Supabase keys the game still runs; sign-in is simply disabled.
 npm run build   # output in dist/
 ```
 
+## Squeekchain Genesis
+
+squeekchain-project: 6fe40ef9-cbb1-4e11-8ec3-d8b55ef4eb67
+
 ## License
 
 All rights reserved unless a license file says otherwise.
