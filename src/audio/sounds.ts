@@ -17,6 +17,8 @@ export const SOUNDS: SoundDef[] = [
   { id: 'sfx.thunder.near', channel: 'sfx', src: null, synth: (c) => [11, 12, 13].map((s) => thunder(c, s, true)), volume: 0.36 },
   { id: 'sfx.thunder.far', channel: 'sfx', src: null, synth: (c) => [21, 22, 23].map((s) => thunder(c, s, false)), volume: 0.26 },
   { id: 'sfx.electric.sparks', channel: 'sfx', src: null, volume: 0.6 },
+  // Buton tıkı (kullanıcının verdiği dosya: thepixelguymaker-button-click-vintage-sound-fx-541135.mp3, 0.24 sn, 7.5 KB)
+  { id: 'ui.click', channel: 'ui', src: '/audio/click.mp3', trim: true, volume: 1 },
   // Müzik şimdilik kapalı (kullanıcı isteği): geri açmak için aşağıdaki satırı ve backgroundAudio'daki setLoop'u aç
   // { id: 'music.ambient', channel: 'music', src: null, synth: async () => [await music()], loop: true, volume: 0.38 },
 ];

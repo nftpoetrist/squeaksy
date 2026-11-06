@@ -92,6 +92,23 @@ grant select on public.equipped_items to authenticated;
 alter table public.profiles add column if not exists day_start date not null default ((now() at time zone 'utc')::date);
 alter table public.profiles add column if not exists day_blocks integer not null default 0 check (day_blocks >= 0);
 
+-- Hamster canı: her hamster 24 saatte en fazla 2 saat koşar, sonra dinlenir (claim_tokens).
+-- Her hamsterin kendi penceresi var: ilk koşuyla başlar; can biterse pencere bittiği andan yeniden başlar
+-- (tam 24 saat dinlenme). Pencere dolunca can tek seferde tam yenilenir, arada hiç dolmaz.
+create table if not exists public.hamster_runs (
+  user_id uuid not null references public.profiles (id) on delete cascade,
+  hamster_id text not null,
+  window_start timestamptz not null,
+  run_seconds numeric(10, 2) not null default 0 check (run_seconds >= 0),
+  primary key (user_id, hamster_id)
+);
+alter table public.hamster_runs enable row level security;
+drop policy if exists "hamster_runs: read own" on public.hamster_runs;
+create policy "hamster_runs: read own" on public.hamster_runs
+  for select using (auth.uid() = user_id);
+revoke insert, update, delete on public.hamster_runs from anon, authenticated;
+grant select on public.hamster_runs to authenticated;
+
 -- Son blok kazanılan an (claim_tokens'ta en az bir blok yazıldığında). Block Bounty "koşuyor mu" diye buna bakar.
 alter table public.profiles add column if not exists last_run_at timestamptz;
 
@@ -179,9 +196,13 @@ $$;
 -- binlerce blok istemek (oynamadan biriktirmek) mümkün olmaz. İstemci her ~3 sn'de gönderir.
 -- Günlük tavan: UTC günü başına en fazla daily_block_cap blok (normal hızda ~9 saat oyun). 7/24 açık
 -- bir bot da en fazla çok oynayan bir insan kadar kazanır. Tavana gelince bloklar (ve final ödülü) yazılmaz.
+-- Hamster canı: koşan hamster, kendi ilk koşusundan itibaren 24 saatte en fazla run_limit_seconds (2 saat).
+-- Can kademeli dolmaz: bitmediyse ilk koşudan 24 saat sonra, bittiyse bittiği andan 24 saat sonra tek seferde tam dolar. Süre, talepler arası
+-- geçen zamandan (en fazla 15 sn) ve blok sayısından (blok başı en az 0.7 sn) büyük olanıyla sayılır:
+-- blokları biriktirip toplu göndermek süreyi kısaltmaz. Süre dolunca pencere bitene kadar blok yazılmaz.
 drop function if exists public.claim_tokens(integer, integer);
 create or replace function public.claim_tokens(p_blocks integer, p_bonus integer default 0)
-returns table (balance bigint, credited_blocks integer, credited_bonus integer, daily_left integer)
+returns table (balance bigint, credited_blocks integer, credited_bonus integer, daily_left integer, run_left integer, run_reset_at timestamptz)
 language plpgsql
 security definer
 set search_path = public
@@ -196,6 +217,11 @@ declare
   day_used integer;
   bonus_tokens constant integer := 10;
   bonus_min_blocks constant integer := 30;
+  run_limit_seconds constant numeric := 7200;
+  run_window constant interval := interval '24 hours';
+  win_start timestamptz;
+  run_used numeric;
+  elapsed numeric;
   allowed integer;
   per_block numeric;
   item_bonus numeric;
@@ -227,15 +253,37 @@ begin
   where e.user_id = uid and e.slot = 'back';
   per_block := per_block + coalesce(item_bonus, 0);
 
-  allowed := floor(least(extract(epoch from (now() - prof.last_claim_at)), max_window_seconds) / min_seconds_per_block)::integer + 3;
+  elapsed := greatest(0, extract(epoch from (now() - prof.last_claim_at)));
+  allowed := floor(least(elapsed, max_window_seconds) / min_seconds_per_block)::integer + 3;
+  -- Koşan hamsterin canı: 24 saat dolduysa yenilenir
+  select h.window_start, h.run_seconds into win_start, run_used
+  from public.hamster_runs h where h.user_id = uid and h.hamster_id = prof.active_hamster for update;
+  run_used := coalesce(run_used, 0);
+  if win_start is not null and now() >= win_start + run_window then
+    win_start := null;
+    run_used := 0;
+  end if;
+  -- Kalan koşu süresi kadar blok (dinlenirken 0)
+  allowed := least(allowed, greatest(0, ceil((run_limit_seconds - run_used) / min_seconds_per_block)::integer));
   -- Yeni UTC günü: sayaç sıfırlanır
   day_used := case when prof.day_start = today then prof.day_blocks else 0 end;
   cb := greatest(0, least(p_blocks, allowed, daily_block_cap - day_used));
   day_used := day_used + cb;
+  if cb > 0 then
+    if win_start is null then
+      win_start := now();
+    end if;
+    run_used := least(run_limit_seconds, run_used + greatest(least(elapsed, 15), cb * min_seconds_per_block));
+    -- Can bu talepte bitti: dinlenme tam 24 saat, bittiği andan sayılır (arada hiç dolmaz)
+    if run_used >= run_limit_seconds then
+      win_start := now();
+    end if;
+  end if;
   prof.blocks_since_bonus := prof.blocks_since_bonus + cb;
 
   -- Her final ödülü en az bonus_min_blocks blok gerektirir; günlük tavan dolmuşsa verilmez
-  if cb > 0 or day_used < daily_block_cap then
+  -- Dinlenen hamster (koşu süresi doldu) final ödülü de alamaz
+  if cb > 0 or (day_used < daily_block_cap and run_used < run_limit_seconds) then
     for i in 1..p_bonus loop
       exit when prof.blocks_since_bonus < bonus_min_blocks;
       cbonus := cbonus + 1;
@@ -259,7 +307,15 @@ begin
   where p.id = uid
   returning p.balance into prof.balance;
 
-  return query select prof.balance, cb, cbonus, daily_block_cap - day_used;
+  if win_start is not null then
+    insert into public.hamster_runs as h (user_id, hamster_id, window_start, run_seconds)
+    values (uid, prof.active_hamster, win_start, run_used)
+    on conflict (user_id, hamster_id) do update set window_start = excluded.window_start, run_seconds = excluded.run_seconds;
+  end if;
+
+  return query select prof.balance, cb, cbonus, daily_block_cap - day_used,
+    ceil(run_limit_seconds - run_used)::integer,
+    case when win_start is null then null else win_start + run_window end;
 end;
 $$;
 

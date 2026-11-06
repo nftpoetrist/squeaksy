@@ -611,6 +611,219 @@ body::after {
   white-space: nowrap;
 }
 
+/* ------------------------------------------------- Hamster canı (24 saatte 2 saat koşu) */
+/* RUN altında: piksel kalp + 10 hücre + kalan süre */
+.run-life {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px 5px 7px;
+  font-family: var(--pixel-font);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #ffe3ef;
+  background: rgba(10, 8, 28, 0.78);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 128, 176, 0.35),
+    0 0 0 1px #05040c;
+  clip-path: polygon(2px 0, calc(100% - 2px) 0, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 0 calc(100% - 2px), 0 2px);
+}
+
+.run-life[hidden] {
+  display: none;
+}
+
+/* Piksel kalp (7x6) */
+.run-life__heart {
+  width: 11px;
+  height: 10px;
+  flex: none;
+  background: #ff5c93;
+  box-shadow: inset 2px 2px 0 #ffb3cd;
+  clip-path: polygon(0 18%, 18% 0, 36% 0, 50% 18%, 64% 0, 82% 0, 100% 18%, 100% 45%, 82% 64%, 64% 82%, 50% 100%, 36% 82%, 18% 64%, 0 45%);
+}
+
+.run-life__bar {
+  display: flex;
+  gap: 2px;
+}
+
+.run-life__bar i {
+  width: 6px;
+  height: 9px;
+  background: #2a2148;
+  box-shadow: inset 0 -2px 0 #1a1430;
+}
+
+.run-life__bar i.is-on {
+  background: #ff7fae;
+  box-shadow:
+    inset 0 2px 0 #ffc2d8,
+    inset 0 -2px 0 #d8457a;
+}
+
+.run-life__time {
+  min-width: 70px;
+  color: #ffe3ef;
+}
+
+/* Son 10 dakika: kalp atar */
+.run-life.is-low .run-life__heart {
+  animation: life-beat 0.9s steps(2, jump-none) infinite;
+}
+
+.run-life.is-low .run-life__bar i.is-on {
+  background: #ffb03a;
+  box-shadow:
+    inset 0 2px 0 #ffe08a,
+    inset 0 -2px 0 #c8741a;
+}
+
+.run-life.is-empty .run-life__heart {
+  background: #5a4a86;
+  box-shadow: inset 2px 2px 0 #7a6ab0;
+}
+
+.run-life.is-empty .run-life__time {
+  color: #b7aee0;
+}
+
+@keyframes life-beat {
+  50% {
+    transform: scale(1.25);
+  }
+}
+
+/* Dinlenirken: gece moru "REST" (tıklanınca sallanır) */
+.run-btn.is-resting {
+  color: #d9d2ff;
+  background: #4a3f8a;
+  cursor: not-allowed;
+  box-shadow:
+    inset -4px -4px 0 #2f2760,
+    inset 4px 4px 0 #7a6cc8,
+    0 0 0 3px #15112e,
+    0 6px 0 3px #15112e,
+    0 14px 24px rgba(0, 0, 0, 0.45);
+}
+
+.run-btn.is-resting:hover {
+  background: #4f4492;
+}
+
+.run-btn.is-nudge,
+.rest-tag.is-nudge {
+  animation: rest-nudge 0.42s steps(6, end);
+}
+
+@keyframes rest-nudge {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  20% {
+    translate: -4px 0;
+  }
+  40% {
+    translate: 4px 0;
+  }
+  60% {
+    translate: -3px 0;
+  }
+  80% {
+    translate: 2px 0;
+  }
+}
+
+.rest-tag.is-nudge {
+  animation-name: rest-nudge-tag;
+}
+
+@keyframes rest-nudge-tag {
+  0%,
+  100% {
+    scale: 1;
+  }
+  40% {
+    scale: 1.12;
+  }
+}
+
+/* Uyuyan hamsterin başının üstünde uyanma sayacı */
+.rest-tag {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, -100%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 8px;
+  font-family: var(--pixel-font);
+  white-space: nowrap;
+  pointer-events: none;
+  background: rgba(16, 12, 40, 0.9);
+  box-shadow:
+    inset 0 0 0 1px rgba(169, 150, 255, 0.55),
+    0 0 0 1px #05040c,
+    0 4px 0 rgba(5, 4, 12, 0.6);
+  clip-path: polygon(2px 0, calc(100% - 2px) 0, 100% 2px, 100% calc(100% - 8px), calc(100% - 2px) calc(100% - 6px), calc(50% + 5px) calc(100% - 6px), 50% 100%, calc(50% - 5px) calc(100% - 6px), 2px calc(100% - 6px), 0 calc(100% - 8px), 0 2px);
+  padding-bottom: 12px;
+  animation: rest-bob 3s ease-in-out infinite;
+}
+
+.rest-tag[hidden] {
+  display: none;
+}
+
+/* Piksel hilal */
+.rest-tag__moon {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  background: radial-gradient(circle at 68% 34%, transparent 0 4.5px, #ffe9a8 5px);
+  clip-path: circle(50%);
+  filter: drop-shadow(0 0 4px rgba(255, 233, 168, 0.6));
+}
+
+.rest-tag__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  line-height: 1;
+}
+
+.rest-tag__label {
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #b7aee0;
+}
+
+.rest-tag__time {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: #fff6c8;
+}
+
+@keyframes rest-bob {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rest-tag,
+  .run-life.is-low .run-life__heart {
+    animation: none;
+  }
+}
+
 /* ------------------------------------------------- İleride dolacak bölümler */
 .section {
   padding: 56px var(--stage-gap);
@@ -1171,6 +1384,29 @@ body::after {
   color: #fff6c8;
   background: rgba(10, 8, 28, 0.82);
   box-shadow: inset 0 0 0 1px rgba(255, 201, 60, 0.35), 0 0 0 1px #05040c;
+}
+
+/* Canı biten hamster yuvasında: canının dolmasına kalan süre (küçük, gece moru) */
+.hut-tag--rest {
+  gap: 5px;
+  padding: 3px 6px 3px 5px;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  color: #e6e0ff;
+  background: rgba(16, 12, 40, 0.88);
+  box-shadow:
+    inset 0 0 0 1px rgba(169, 150, 255, 0.5),
+    0 0 0 1px #05040c;
+  clip-path: polygon(2px 0, calc(100% - 2px) 0, 100% 2px, 100% calc(100% - 2px), calc(100% - 2px) 100%, 2px 100%, 0 calc(100% - 2px), 0 2px);
+  pointer-events: none;
+}
+
+.hut-tag__moon {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  background: radial-gradient(circle at 70% 32%, transparent 0 2.6px, #ffe9a8 3px);
+  clip-path: circle(50%);
 }
 
 /* Gölgeli (satın alınmamış) hamsterin tam ortasında fiyat: piksel kesimli altın etiket */
@@ -2426,6 +2662,30 @@ body {
   }
   .run-hint {
     display: none;
+  }
+  /* Kısa panelde can çubuğu butonun yanında: zeminin altına taşmaz */
+  .run-control:has(.run-life:not([hidden])) {
+    flex-direction: row;
+    gap: 10px;
+  }
+  .run-life {
+    gap: 5px;
+    padding: 3px 6px;
+    font-size: 8px;
+  }
+  .run-life__bar i {
+    width: 4px;
+    height: 7px;
+  }
+  .run-life__time {
+    min-width: 58px;
+  }
+  .rest-tag {
+    gap: 6px;
+    padding: 4px 8px 10px 6px;
+  }
+  .rest-tag__time {
+    font-size: 11px;
   }
 }
 

@@ -1,6 +1,7 @@
 import {
   ANCHOR_X,
   ANCHOR_Y,
+  BASE_W,
   DEFAULT_POSE,
   drawHamsterPose as drawPose,
   EYE_RECT,
@@ -533,6 +534,17 @@ export class HamsterActor {
   /** Ayak noktası (iç piksel): değiş-tokuş koşucularının hedefi */
   get feet(): [number, number] {
     return this.L ? this.footPos() : [0, 0];
+  }
+
+  /** Hamsterin başının üstü (iç piksel): can sayacı / uyanma sayacı buraya yerleşir */
+  headTop(): [number, number] {
+    const [fx, fy] = this.footPos();
+    const flip = this.frame().flip;
+    const ox = Math.round(fx - ANCHOR_X);
+    const oy = Math.round(fy - ANCHOR_Y);
+    // Gövdenin ortası (yüz tarafına biraz kaymış) ve sprite'ın tepesi
+    const cx = BASE_W * 0.55;
+    return [flip ? ox + 2 * ANCHOR_X - cx : ox + cx, oy];
   }
 
   /** Sırttaki Pixsy'nin sahnedeki merkezi (iç piksel): uçuş animasyonu için */

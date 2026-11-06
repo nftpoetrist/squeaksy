@@ -4,6 +4,7 @@ import type { PixelStormBackground } from '../background/Background';
 import { cardArt } from '../collection/art';
 import { cardById, CARDS, RARITIES, type CardDef } from '../collection/cards';
 import { smoothScrollToEl } from './smoothScroll';
+import { clock, type RunBudget } from '../auth/runBudget';
 
 /** Kulübenin önünde uyuyan hamsterler: koşan hariç tüm hamster kartları */
 export function hutSleepers(inv: Inventory): CardDef[] {
@@ -21,7 +22,7 @@ export function mountHutMenu(
   ledger: TokenLedger,
   signIn: () => void,
   opts: { onBuy?: (id: string) => void } = {},
-): { refresh: () => void; open: (id: string) => void } {
+): { refresh: () => void; open: (id: string) => void; setBudget: (b: RunBudget) => void } {
   const layer = document.createElement('div');
   layer.className = 'hut-ui';
   stage.appendChild(layer);
@@ -34,6 +35,10 @@ export function mountHutMenu(
   const fmt = new Intl.NumberFormat('en-US');
   let openId: string | null = null;
   let status = '';
+  /** Hamster canları: canı biten hamsterin yuvasında canının dolmasına kalan süre */
+  let budget: RunBudget | null = null;
+  const restTags = new Map<string, HTMLElement>();
+  let restingKey = '';
 
   const close = () => {
     openId = null;
@@ -43,6 +48,7 @@ export function mountHutMenu(
 
   const renderSpots = () => {
     layer.replaceChildren();
+    restTags.clear();
     const spots = bg.getHutSpotsInStage();
     for (const sp of spots) {
       const c = cardById(sp.id);
@@ -62,6 +68,17 @@ export function mountHutMenu(
         tag.className = 'hut-tag hut-tag--price';
         tag.append(Object.assign(document.createElement('i'), { className: 'hut-tag__coin' }), document.createTextNode(fmt.format(c.price ?? 0)));
         b.append(tag);
+      } else if (budget?.isResting(c.id)) {
+        // Canı bitti: yuvasında küçük hilal + canın dolmasına kalan süre
+        b.classList.add('is-resting');
+        const tag = document.createElement('span');
+        tag.className = 'hut-tag hut-tag--rest';
+        const t = document.createElement('span');
+        t.textContent = clock(budget.wakeInMs(c.id) / 1000);
+        tag.append(Object.assign(document.createElement('i'), { className: 'hut-tag__moon' }), t);
+        b.append(tag);
+        restTags.set(c.id, t);
+        b.setAttribute('aria-label', `${c.name}, resting, full energy in ${t.textContent}`);
       }
       b.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -177,6 +194,8 @@ export function mountHutMenu(
         }
       };
     } else if (owned) {
+      if (budget?.isResting(c.id)) need = `Resting · full energy in ${clock(budget.wakeInMs(c.id) / 1000)}`;
+      else if (budget?.active) need = `Energy · ${clock(budget.left(c.id))} of running left`;
       btn.textContent = 'Run with this hamster';
       btn.disabled = inv.busy;
       btn.onclick = async () => {
@@ -250,5 +269,26 @@ export function mountHutMenu(
   });
   inv.onChange(refresh);
   refresh();
-  return { refresh, open };
+
+  const restKey = () => (budget ? CARDS.filter((c) => c.kind === 'Hamster' && budget!.isResting(c.id)).map((c) => c.id).join(',') : '');
+  const setBudget = (b: RunBudget) => {
+    budget = b;
+    restingKey = restKey();
+    b.onChange(() => {
+      // Dinlenenler değişti (biri bitti / uyandı): yuvalar yeniden çizilir; yoksa sadece süreler güncellenir
+      const k = restKey();
+      if (k !== restingKey) {
+        restingKey = k;
+        refresh();
+        return;
+      }
+      for (const [id, t] of restTags) t.textContent = clock(b.wakeInMs(id) / 1000);
+      if (openId && budget?.isResting(openId) && !inv.busy) {
+        const st = pop.querySelector('.hut-pop__status');
+        if (st && !status) st.textContent = `Resting · full energy in ${clock(b.wakeInMs(openId) / 1000)}`;
+      }
+    });
+    refresh();
+  };
+  return { refresh, open, setBudget };
 }

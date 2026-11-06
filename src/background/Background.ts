@@ -287,8 +287,22 @@ export class PixelStormBackground {
     });
   }
 
+  /** Can bitti (dinleniyor): kilitliyken hamster koşmaya başlayamaz; koşuyorsa yatağına döner */
+  private runLocked = false;
+  setRunLocked(on: boolean): void {
+    if (on === this.runLocked) return;
+    this.runLocked = on;
+    if (on && this.hamster.desired) this.setHamsterRunning(false);
+    else this.events.emit('hamster:state', { state: this.hamster.state, running: this.hamster.desired });
+  }
+
+  get runLockedNow(): boolean {
+    return this.runLocked;
+  }
+
   /** Hamsteri koşturur / durdurur. Çarkı hamster döndürür. */
   setHamsterRunning(on: boolean): void {
+    if (on && this.runLocked) return;
     this.hamster.setRunning(on);
     this.events.emit('hamster:state', { state: this.hamster.state, running: this.hamster.desired });
   }
@@ -551,6 +565,14 @@ export class PixelStormBackground {
   /** Çarka bağlı bulut kümesinin indeksi: strikeBlock({ cluster }) için */
   get wheelCluster(): number {
     return this.blocks.wheelCluster;
+  }
+
+  /** Hamsterin başının üstü, sahne kutusuna (#world) göre CSS piksel: can / uyanma sayacı için */
+  getHamsterHeadInStage(): { x: number; y: number } | null {
+    if (!this.scene) return null;
+    const [x, y] = this.hamster.headTop();
+    const k = this.scale;
+    return { x: (x - MARGIN) * k, y: (y - MARGIN) * k };
   }
 
   /** Çarkın sahne kutusuna (#world) göre CSS piksel geometrisi: buton vb. yerleşimi için */

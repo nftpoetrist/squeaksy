@@ -1,4 +1,5 @@
-export type AudioChannel = 'ambience' | 'sfx' | 'music';
+/** ui: buton tıkları. Uzaklık boğuklaştırmasından ve sıkıştırıcıdan geçmez: sitenin her yerinde aynı net duyulur */
+export type AudioChannel = 'ambience' | 'sfx' | 'music' | 'ui';
 
 export interface SoundDef {
   id: string;
@@ -14,6 +15,22 @@ export interface SoundDef {
    * ilk N saniyenin üstüne yumuşakça bindirilir. Böylece dönüş noktasında tık / boşluk / ses düşmesi olmaz.
    */
   seamless?: number;
+  /** Baştaki sessizlik (kodlayıcı boşluğu dahil) kırpılır: kısa efektler basıldığı anda duyulur */
+  trim?: boolean;
+}
+
+/** Baştaki sessizliği kırpar (tık sesinde gecikme olmasın) */
+function trimStart(ctx: BaseAudioContext, src: AudioBuffer): AudioBuffer {
+  const chans = Array.from({ length: src.numberOfChannels }, (_, c) => src.getChannelData(c));
+  const thr = 0.003; // ~ -50 dB
+  let s = 0;
+  while (s < src.length - 1 && !chans.some((d) => Math.abs(d[s]!) > thr)) s++;
+  // Tıklama (pop) olmasın diye 1 ms geriden başlar
+  s = Math.max(0, s - Math.floor(src.sampleRate * 0.001));
+  if (s === 0) return src;
+  const out = ctx.createBuffer(src.numberOfChannels, src.length - s, src.sampleRate);
+  chans.forEach((d, c) => out.getChannelData(c).set(d.subarray(s)));
+  return out;
 }
 
 /** Döngüyü dikişsiz yapar: sessiz uçları kırpar, sonu başa eşit güçle (gürültü için) bindirir. */
@@ -60,6 +77,9 @@ interface LoopState {
  * - Kanal başına ses seviyesi (ambiyans / efekt / müzik) + ana ses.
  * - Ses dosyası tanımlı değilse (`src: null`) çağrılar sessizce yok sayılır.
  */
+/** Hoparlöre giden son seviye: 1.3 = önceki sesin %30 fazlası */
+const OUTPUT_GAIN = 1.3;
+
 export class AudioManager {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
@@ -68,8 +88,10 @@ export class AudioManager {
   private buffers = new Map<string, AudioBuffer[]>();
   private loading = new Map<string, Promise<void>>();
   private loops = new Map<string, LoopState>();
+  /** Önceden indirilmiş dosyalar (ses motoru açılmadan): ilk basışta sadece çözme kalır */
+  private prefetched = new Map<string, Promise<ArrayBuffer>>();
   // Saatlerce dinlense de yormasın: düşük seviyeler
-  private volumes: Record<AudioChannel | 'master', number> = { master: 0.5, ambience: 0.5, sfx: 0.45, music: 0.32 };
+  private volumes: Record<AudioChannel | 'master', number> = { master: 0.5, ambience: 0.5, sfx: 0.45, music: 0.32, ui: 0.42 };
   private enabled = false;
   /** Uzaklık: kaydırınca ses kısılır ve boğuklaşır (1 = oyun panelinin başında) */
   private near: GainNode | null = null;
@@ -123,17 +145,51 @@ export class AudioManager {
       soft.attack.value = 0.02;
       soft.release.value = 0.4;
       this.applyProximity(0);
-      this.master.connect(soft).connect(this.muffle).connect(this.near).connect(this.ctx.destination);
+      // Son çıkış: sıkıştırıcıdan sonra (sesin tamamı aynı oranda %30 yükselir; önceye konsa sıkıştırıcı yutardı)
+      const out = this.ctx.createGain();
+      out.gain.value = OUTPUT_GAIN;
+      this.master.connect(soft).connect(this.muffle).connect(this.near).connect(out).connect(this.ctx.destination);
       for (const ch of ['ambience', 'sfx', 'music'] as const) {
         const g = this.ctx.createGain();
         g.gain.value = this.volumes[ch];
         g.connect(this.master);
         this.channels.set(ch, g);
       }
+      // Buton tıkları: doğrudan son çıkışa (ses kapalıyken 0)
+      const ui = this.ctx.createGain();
+      ui.gain.value = this.enabled ? this.volumes.ui : 0;
+      ui.connect(out);
+      this.channels.set('ui', ui);
     }
     if (this.ctx.state === 'suspended' && !this.hidden) await this.ctx.resume();
+    // Buton sesi küçük: ses kapalıyken de önceden hazırlanır, açılınca ilk tıkta gecikmesiz çalar
+    void Promise.all([...this.defs.values()].filter((d) => d.channel === 'ui').map((d) => this.load(d.id)));
     // Sesler sadece ses açıksa üretilir/yüklenir (kapalıyken hiç işlemci harcanmaz)
     if (this.enabled) await this.loadAll();
+  }
+
+  /** Küçük bir sesi (ör. buton tıkı) sayfa açılırken indirir; ses motoru açılınca anında çözülür */
+  prefetch(id: string): void {
+    const def = this.defs.get(id);
+    const url = def && typeof def.src === 'string' ? def.src : null;
+    if (!url || this.prefetched.has(url)) return;
+    this.prefetched.set(
+      url,
+      fetch(url).then((r) => {
+        if (!r.ok) throw new Error(`${url}: HTTP ${r.status}`);
+        return r.arrayBuffer();
+      }),
+    );
+  }
+
+  /** Ses şu an çalınabilir mi (açık, motor çalışıyor, dosya hazır) */
+  canPlay(id: string): boolean {
+    return this.enabled && this.unlocked && (this.buffers.get(id)?.length ?? 0) > 0;
+  }
+
+  /** Ses hazır olunca çözülür (yüklü değilse yükler) */
+  ready(id: string): Promise<void> {
+    return this.load(id);
   }
 
   private loadAll(): Promise<void> {
@@ -175,6 +231,8 @@ export class AudioManager {
   setEnabled(on: boolean): void {
     this.enabled = on;
     if (this.master && this.ctx) this.ramp(this.master.gain, on ? this.volumes.master : 0, on ? 1.2 : 0.4);
+    const ui = this.channels.get('ui');
+    if (ui) this.ramp(ui.gain, on ? this.volumes.ui : 0, 0.02);
     if (!on) for (const id of [...this.loops.keys()]) this.setLoop(id, 0, 0.4);
     else if (this.ctx) void this.loadAll();
   }
@@ -182,7 +240,7 @@ export class AudioManager {
   setVolume(channel: AudioChannel | 'master', v: number): void {
     this.volumes[channel] = Math.max(0, Math.min(1, v));
     const node = channel === 'master' ? this.master : this.channels.get(channel);
-    if (node && (channel !== 'master' || this.enabled)) this.ramp(node.gain, this.volumes[channel], 0.15);
+    if (node && ((channel !== 'master' && channel !== 'ui') || this.enabled)) this.ramp(node.gain, this.volumes[channel], 0.15);
   }
 
   private load(id: string): Promise<void> {
@@ -209,10 +267,19 @@ export class AudioManager {
     const srcs = Array.isArray(def.src) ? def.src : [def.src];
     const p = Promise.all(
       srcs.map(async (url) => {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
-        const buf = await ctx.decodeAudioData(await res.arrayBuffer());
-        return def.loop && def.seamless ? makeSeamless(ctx, buf, def.seamless) : buf;
+        const pre = this.prefetched.get(url);
+        let bytes: ArrayBuffer;
+        if (pre) {
+          this.prefetched.delete(url);
+          bytes = await pre;
+        } else {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+          bytes = await res.arrayBuffer();
+        }
+        const buf = await ctx.decodeAudioData(bytes);
+        if (def.loop && def.seamless) return makeSeamless(ctx, buf, def.seamless);
+        return def.trim ? trimStart(ctx, buf) : buf;
       }),
     )
       .then((bufs) => {

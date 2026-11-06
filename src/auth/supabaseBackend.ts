@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { DAILY_BLOCK_CAP, type ItemSlot } from '../collection/cards';
-import type { AuthBackend, ClaimResult, LeaderKind, LeaderPage, LeaderRow, Player } from './types';
+import type { AuthBackend, ClaimResult, LeaderKind, LeaderPage, LeaderRow, Player, RunBudgetState } from './types';
+import { parseServerTime, RUN_LIMIT_SECONDS, RUN_WINDOW_MS } from './runBudget';
 import { parseBountyClaim, parseChainLive, type BountyClaim, type ChainLive } from '../chain/types';
 
 /** X profil fotoğrafı: '_normal' (48px) yerine 400×400 sürümü */
@@ -94,6 +95,20 @@ export class SupabaseBackend implements AuthBackend {
     const row = data as { day_start: string | null; day_blocks: number | null };
     const today = new Date().toISOString().slice(0, 10);
     return row.day_start === today ? Math.max(0, DAILY_BLOCK_CAP - Number(row.day_blocks ?? 0)) : DAILY_BLOCK_CAP;
+  }
+
+  async fetchRunBudgets(): Promise<Record<string, RunBudgetState> | null> {
+    if (!this.player) return null;
+    const { data, error } = await this.sb.from('hamster_runs').select('hamster_id, window_start, run_seconds').eq('user_id', this.player.id);
+    // Eski şema (tablo yok): can sınırı yok sayılır
+    if (error) return null;
+    const out: Record<string, RunBudgetState> = {};
+    for (const row of (data ?? []) as Array<{ hamster_id: string; window_start: string; run_seconds: number | string }>) {
+      const start = parseServerTime(row.window_start);
+      if (!Number.isFinite(start) || Date.now() >= start + RUN_WINDOW_MS) continue;
+      out[row.hamster_id] = { left: Math.max(0, Math.ceil(RUN_LIMIT_SECONDS - Number(row.run_seconds))), resetAt: new Date(start + RUN_WINDOW_MS).toISOString() };
+    }
+    return out;
   }
 
   async fetchBalance(): Promise<number> {
@@ -206,12 +221,21 @@ export class SupabaseBackend implements AuthBackend {
   async claim(blocks: number, bonus: number): Promise<ClaimResult> {
     const { data, error } = await this.sb.rpc('claim_tokens', { p_blocks: blocks, p_bonus: bonus });
     if (error) throw error;
-    const row = (Array.isArray(data) ? data[0] : data) as { balance: number; credited_blocks: number; credited_bonus: number; daily_left?: number };
+    const row = (Array.isArray(data) ? data[0] : data) as {
+      balance: number;
+      credited_blocks: number;
+      credited_bonus: number;
+      daily_left?: number;
+      run_left?: number | null;
+      run_reset_at?: string | null;
+    };
     return {
       balance: Number(row.balance),
       creditedBlocks: row.credited_blocks,
       creditedBonus: row.credited_bonus,
       dailyLeft: row.daily_left === undefined || row.daily_left === null ? undefined : Number(row.daily_left),
+      runLeft: row.run_left === undefined || row.run_left === null ? undefined : Number(row.run_left),
+      runResetAt: row.run_reset_at ?? null,
     };
   }
 }

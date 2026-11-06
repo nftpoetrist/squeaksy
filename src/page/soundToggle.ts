@@ -96,6 +96,8 @@ export function mountSoundToggle(stage: HTMLElement, hud: HTMLElement, audio: Au
     render();
     await audio.unlock();
     audio.setEnabled(on);
+    // Ses açıldı: onay tıkı (kapalıyken basışta tık çalamazdı)
+    if (on) void audio.ready('ui.click').then(() => audio.play('ui.click'));
   });
 
   // Sayacın solunda, dikeyde ortalı (sayaç genişliği yıldız sayısıyla değişir)

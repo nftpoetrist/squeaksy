@@ -1,5 +1,6 @@
-import { cardById, DAILY_BLOCK_CAP, ratePerBlock, type ItemSlot } from '../collection/cards';
-import type { AuthBackend, ClaimResult, LeaderKind, LeaderPage, LeaderRow, Player } from './types';
+import { CARDS, cardById, DAILY_BLOCK_CAP, ratePerBlock, type ItemSlot } from '../collection/cards';
+import type { AuthBackend, ClaimResult, LeaderKind, LeaderPage, LeaderRow, Player, RunBudgetState } from './types';
+import { RUN_LIMIT_SECONDS, RUN_WINDOW_MS } from './runBudget';
 
 /** Basit sahte profil fotoğrafı (data URL): pikselleştirmeyi denemek için */
 function fakeAvatar(): string {
@@ -231,9 +232,59 @@ export class MockBackend implements AuthBackend {
     return this.dailyLeft();
   }
 
+  /**
+   * Koşu hakkı (sunucudaki kuralın aynısı, tarayıcıda). Test: ?dev&mockUser=a&mockRunLeft=20 → 20 sn sonra dinlenir;
+   * ?mockResting=90 → dinleniyor, 90 sn sonra uyanır.
+   */
+  private runState(id = this.player?.activeHamster ?? 'starter-hamster'): { start: number | null; used: number } {
+    const raw = this.load(`run.${id}`);
+    if (raw) {
+      const v = JSON.parse(raw) as { start: number | null; used: number };
+      if (v.start !== null && Date.now() >= v.start + RUN_WINDOW_MS) return { start: null, used: 0 };
+      return v;
+    }
+    const q = new URLSearchParams(location.search);
+    // mockRunLeft: her hamsterin kendi kısa canı (hepsi ayrı ayrı test edilir); ilk koşuda başlar
+    const left = Number(q.get('mockRunLeft'));
+    // mockResting: sadece açılıştaki (aktif) hamster dinleniyor
+    const resting = Number(q.get('mockResting'));
+    if (id === (this.player?.activeHamster ?? 'starter-hamster') && q.has('mockResting') && resting > 0) {
+      return { start: Date.now() + resting * 1000 - RUN_WINDOW_MS, used: RUN_LIMIT_SECONDS };
+    }
+    if (q.has('mockRunLeft') && left >= 0) return { start: null, used: Math.max(0, RUN_LIMIT_SECONDS - left) };
+    return { start: null, used: 0 };
+  }
+
+  private toBudget(v: { start: number | null; used: number }): RunBudgetState {
+    return { left: Math.max(0, Math.ceil(RUN_LIMIT_SECONDS - v.used)), resetAt: v.start === null ? null : new Date(v.start + RUN_WINDOW_MS).toISOString() };
+  }
+
+  async fetchRunBudgets(): Promise<Record<string, RunBudgetState> | null> {
+    const out: Record<string, RunBudgetState> = {};
+    // Tüm hamster kartları (sonradan satın alınanlar da kendi canıyla gelsin)
+    for (const id of CARDS.filter((c) => c.kind === 'Hamster').map((c) => c.id)) {
+      const v = this.runState(id);
+      this.store(`run.${id}`, JSON.stringify(v));
+      if (v.start !== null || v.used > 0) out[id] = this.toBudget(v);
+    }
+    return out;
+  }
+
   async claim(rawBlocks: number, rawBonus: number): Promise<ClaimResult> {
+    const run = this.runState();
+    const now = Date.now();
+    const elapsed = Math.max(0, (now - Number(this.load('lastClaim') ?? now)) / 1000);
+    this.store('lastClaim', String(now));
+    const runCap = Math.max(0, Math.ceil((RUN_LIMIT_SECONDS - run.used) / 0.7));
     const left = this.dailyLeft();
-    const blocks = Math.min(rawBlocks, left);
+    const blocks = Math.min(rawBlocks, left, runCap);
+    if (blocks > 0) {
+      if (run.start === null) run.start = now;
+      run.used = Math.min(RUN_LIMIT_SECONDS, run.used + Math.max(Math.min(elapsed, 15), blocks * 0.7));
+      // Can bitti: tam 24 saat dinlenme, bittiği andan
+      if (run.used >= RUN_LIMIT_SECONDS) run.start = now;
+    }
+    this.store(`run.${this.player?.activeHamster ?? 'starter-hamster'}`, JSON.stringify(run));
     const bonus = blocks > 0 ? rawBonus : 0;
     this.store('dailyLeft', String(left - blocks));
     const eq = await this.fetchEquipped();
@@ -248,7 +299,8 @@ export class MockBackend implements AuthBackend {
     } catch {
       /* yok say */
     }
-    return { balance, creditedBlocks: blocks, creditedBonus: bonus, dailyLeft: left - blocks };
+    const budget = this.toBudget(run);
+    return { balance, creditedBlocks: blocks, creditedBonus: bonus, dailyLeft: left - blocks, runLeft: budget.left, runResetAt: budget.resetAt };
   }
 }
 

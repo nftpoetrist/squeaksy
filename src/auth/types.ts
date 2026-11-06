@@ -19,6 +19,18 @@ export interface ClaimResult {
   creditedBonus: number;
   /** Bugün (UTC) yıldız kazandırabilecek kalan blok; eski sunucu şeması döndürmezse undefined */
   dailyLeft?: number;
+  /** Koşan hamsterin canı: 24 saatlik pencerede kalan saniye (eski şemada undefined) */
+  runLeft?: number;
+  /** Koşu penceresinin bittiği an (ISO); pencere başlamadıysa null */
+  runResetAt?: string | null;
+}
+
+/** Hamsterin koşu hakkı: 24 saatte en fazla 2 saat */
+export interface RunBudgetState {
+  /** Kalan koşu süresi (sn) */
+  left: number;
+  /** Pencerenin bittiği an (ISO); pencere başlamadıysa null */
+  resetAt: string | null;
 }
 
 /** Giriş + bakiye arka ucu (Supabase ya da geliştirici için sahte) */
@@ -35,6 +47,8 @@ export interface AuthBackend {
   /** Bugün (UTC) kalan blok hakkı (bilinmiyorsa null) */
   fetchDailyLeft?(): Promise<number | null>;
   claim(blocks: number, bonus: number): Promise<ClaimResult>;
+  /** Hamster canları (hamster kartı → durum; kaydı olmayan hamster tam canlı). Eski şemada null */
+  fetchRunBudgets?(): Promise<Record<string, RunBudgetState> | null>;
   /** Satın alınmış kartlar (başlangıç kartları hariç) */
   fetchOwned(): Promise<string[]>;
   /** Kart satın alır; yeni bakiyeyi döner */

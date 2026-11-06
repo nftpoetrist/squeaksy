@@ -9,6 +9,8 @@ import { bindAnchorScroll } from './page/smoothScroll';
 import { pixelIcon, type PixelIconName } from './page/pixelIcons';
 import { mountAbout } from './page/about';
 import { mountRunButton } from './page/runButton';
+import { bindUiClicks } from './audio/uiClicks';
+import { RunBudget } from './auth/runBudget';
 import { mountTokenHud } from './page/tokenHud';
 import { mountSoundToggle } from './page/soundToggle';
 import { mountAuthMenu } from './page/authMenu';
@@ -46,13 +48,15 @@ const audio = new AudioManager();
 audio.register(SOUNDS);
 audio.attachUnlock();
 bindBackgroundAudio(background.events, audio);
+// Her butona basışta tık sesi (ses açıkken)
+bindUiClicks(audio);
 
 // Sahne ekrandan çıkınca (sayfa aşağı kaydırılınca) çizim durur ama oyun sürer:
 // hamster koşmaya ve yıldız kazanmaya devam eder. Sekme değişince oyun tamamen durur.
 new IntersectionObserver(([entry]) => background.setOffscreen(!entry?.isIntersecting)).observe(world);
 
 // RUN butonu: çarkın altında, hamsteri uyandırıp koşturur / durdurur
-mountRunButton(world, background);
+const runUi = mountRunButton(world, background);
 // ------------------------------------------------ X ile giriş + kalıcı token bakiyesi
 async function createBackend(): Promise<AuthBackend> {
   const mock = DEV ? params.get('mockUser') : null;
@@ -175,9 +179,38 @@ void (async () => {
   hutUi = mountHutMenu(world, background, inventory, ledger, signIn, { onBuy: (id) => shop?.focus(id) });
   syncHamsters();
 
-  // Yıldız kazanımı: giriş yapılmış ve günlük tavan dolmamışsa
-  const syncEarning = () => background.setEarning(ledger.signedIn && !ledger.capped);
+  // Hamster canı: her hamster 24 saatte en fazla 2 saat koşar (sunucu claim_tokens'ta uygular).
+  // Can biterse hamster yatağına döner ve pencere bitene kadar uyur; başka bir hamster kendi canıyla koşabilir.
+  const budget = new RunBudget();
+  ledger.onRunBudgets = (all) => budget.syncAll(all);
+  ledger.onRunBudget = (id, s) => budget.sync(id, s);
+  ledger.resting = () => budget.resting;
+  budget.setActive(inventory.active);
+  inventory.onChange(() => budget.setActive(inventory.active));
+  runUi.setBudget(budget);
+  hutUi?.setBudget(budget);
+  let lastTick = performance.now();
+  window.setInterval(() => {
+    const now = performance.now();
+    const dt = Math.min(5, (now - lastTick) / 1000);
+    lastTick = now;
+    const running = ledger.signedIn && background.hamsterRunning && background.hamsterState === 'run' && !document.hidden;
+    budget.tick(dt, running);
+  }, 1000);
+
+  // Yıldız kazanımı: giriş yapılmış, günlük tavan dolmamış ve hamsterin canı varsa
+  const syncEarning = () => background.setEarning(ledger.signedIn && !ledger.capped && !budget.resting);
   ledger.onChange(syncEarning);
+  let wasResting = false;
+  budget.onChange(() => {
+    const r = budget.resting;
+    if (r === wasResting) return;
+    wasResting = r;
+    background.setRunLocked(r);
+    syncEarning();
+    // Son saniyelerin blokları hemen gönderilsin
+    if (r) void ledger.flush();
+  });
   const apply = (p: Player | null) => {
     background.setEarning(p !== null);
     menu?.render(p);

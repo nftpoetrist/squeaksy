@@ -1,5 +1,5 @@
 import { FINALE_BONUS, tokensPerBlock } from '../collection/cards';
-import type { AuthBackend, Player } from './types';
+import type { AuthBackend, Player, RunBudgetState } from './types';
 
 const FLUSH_DELAY = 3000;
 const RETRY = [4000, 10000, 30000, 60000];
@@ -34,6 +34,11 @@ export class TokenLedger {
 
   /** Blok başı yıldız oranı (hamster + sırttaki Pixsy); main.ts envanterden bağlar */
   rate: (() => number) | null = null;
+  /** Hamster canları geldi (girişte hepsi; her claim yanıtında koşan hamsterinki); main.ts RunBudget'a bağlar */
+  onRunBudgets: ((all: Record<string, RunBudgetState> | null) => void) | null = null;
+  onRunBudget: ((hamster: string, s: RunBudgetState) => void) | null = null;
+  /** Hamster dinleniyor (koşu süresi doldu): blok yazılmaz */
+  resting: () => boolean = () => false;
 
   /** Blok başı yıldız: hamster nadirliği + sırttaki Pixsy bonusu (ör. 1.5) */
   get perBlock(): number {
@@ -104,13 +109,21 @@ export class TokenLedger {
     this.ready = false;
     this.failures = 0;
     this.applyDailyLeft(null);
+    this.onRunBudgets?.(null);
     this.changed();
     if (!p) return;
     this.restore();
     try {
-      const [bal, left] = await Promise.all([this.backend.fetchBalance(), this.backend.fetchDailyLeft?.().catch(() => null) ?? null]);
+      const [bal, left, run] = await Promise.all([
+        this.backend.fetchBalance(),
+        this.backend.fetchDailyLeft?.().catch(() => null) ?? null,
+        this.backend.fetchRunBudgets?.().catch(() => null) ?? null,
+      ]);
       this.balance = bal;
-      if (this.player === p) this.applyDailyLeft(left);
+      if (this.player === p) {
+        this.applyDailyLeft(left);
+        this.onRunBudgets?.(run);
+      }
     } catch (err) {
       console.warn('[Squeaksy] bakiye yüklenemedi', err);
     }
@@ -122,7 +135,7 @@ export class TokenLedger {
 
   /** Hamster bir blok tamamladı: +perBlock token (sunucu blok sayısını nadirlikle çarpar) */
   addBlock(): void {
-    if (!this.player || this.capped) return;
+    if (!this.player || this.capped || this.resting()) return;
     this.pendingBlocks++;
     this.persist();
     this.changed();
@@ -131,7 +144,7 @@ export class TokenLedger {
 
   /** Final: tüm bloklar tamamlandı, yıldırımlar çarptı: +10 */
   addBonus(): void {
-    if (!this.player || this.capped) return;
+    if (!this.player || this.capped || this.resting()) return;
     this.pendingBonus++;
     this.persist();
     this.changed();
@@ -183,6 +196,8 @@ export class TokenLedger {
 
   private async send(): Promise<void> {
     const p = this.player!;
+    // Sunucu bloğu o an koşan hamsterin canından düşer
+    const hamster = p.activeHamster;
     const blocks = this.pendingBlocks;
     const bonus = this.pendingBonus;
     try {
@@ -195,6 +210,7 @@ export class TokenLedger {
       this.failures = 0;
       this.persist();
       this.applyDailyLeft(res.dailyLeft);
+      if (res.runLeft !== undefined) this.onRunBudget?.(hamster, { left: res.runLeft, resetAt: res.runResetAt ?? null });
       this.changed();
     } catch (err) {
       console.warn('[Squeaksy] tokenlar gönderilemedi, tekrar denenecek', err);
