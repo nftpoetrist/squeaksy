@@ -86,9 +86,12 @@ export function mountTokenHud(
     sub.textContent = s.phase === 'charge' ? 'Storm surge!' : `Cloud ${Math.min(s.clouds + 1, s.totalClouds)} / ${s.totalClouds}`;
   };
   // Coinlerin uçacağı nokta: ikonun merkezi (sahneye göre)
+  // Panel gizliyken (Leaderboard sayfası) ölçüm 0×0 çıkar: o zaman eski hedef korunur,
+  // yoksa coinler sol üst köşeye (gökyüzünün soluna) uçar.
   const place = () => {
     const r = coin.getBoundingClientRect();
     const sr = stage.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0 || sr.width === 0 || sr.height === 0) return;
     bg.setTokenTarget(r.left - sr.left + r.width / 2, r.top - sr.top + r.height / 2);
   };
 
@@ -104,6 +107,14 @@ export function mountTokenHud(
   bg.events.on('scene:resize', place);
   ledger.onChange(refresh);
   window.addEventListener('resize', place);
+  window.addEventListener('squeaksy:page', () => requestAnimationFrame(place));
+  // Sayaç genişleyince/daralınca (giriş, büyüyen sayı, font yüklenmesi) ikon yer değiştirir: hedef de güncellenir
+  if ('ResizeObserver' in window) {
+    const ro = new ResizeObserver(() => place());
+    ro.observe(el);
+    ro.observe(stage);
+  }
+  void document.fonts?.ready.then(place);
   place();
   refresh();
   return { refresh };
