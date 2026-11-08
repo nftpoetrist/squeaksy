@@ -245,12 +245,9 @@ void (async () => {
     const worn = inventory.equippedIn('back');
     if (worn && itemBudget.isResting(worn)) void inventory.restItem(worn);
   });
-  runUi.setItemBudget(itemBudget, () => {
-    const id = inventory.equippedIn('back');
-    const c = id ? cardById(id) : undefined;
-    return c?.buddy ? { id: c.id, kind: c.buddy, name: c.name } : null;
-  });
   hutUi?.setItemBudget(itemBudget);
+  // Yalnızca geliştirme testleri (?dev): Pixsy canı ve sırttaki eşya (yayın derlemesinde DEV=false, kod çıkar)
+  if (DEV) Object.assign(window, { squeaksyItems: { budget: itemBudget, worn: () => inventory.equippedIn('back') } });
 
   let lastTick = performance.now();
   window.setInterval(() => {

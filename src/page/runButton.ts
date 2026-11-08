@@ -2,8 +2,6 @@ import type { PixelStormBackground } from '../background/Background';
 import { ONCHAIN } from '../onchain/config';
 import type { HamsterState } from '../background/layers/hamster';
 import { clock, type RunBudget } from '../auth/runBudget';
-import { itemSprite } from '../background/layers/hut';
-import type { PixsyKind } from '../character/companion';
 
 const HINTS: Record<HamsterState, string> = {
   sleep: '',
@@ -23,8 +21,6 @@ const LIFE_CELLS = 10;
 export interface RunButtonUi {
   /** Hamster canı: RUN altında can çubuğu, can bitince uyanma sayacı */
   setBudget(b: RunBudget): void;
-  /** Pixsy canı: sırtta bir Pixsy varken can çubuğunun altında kendi çubuğu */
-  setItemBudget(b: RunBudget, current: () => { id: string; kind: PixsyKind; name: string } | null): void;
 }
 
 /**
@@ -54,50 +50,10 @@ export function mountRunButton(stage: HTMLElement, bg: PixelStormBackground): Ru
   lifeText.className = 'run-life__time';
   life.append(heart, cells, lifeText);
 
-  // Pixsy can çubuğu: sırttaki Pixsy'nin küçük görseli + 10 hücre + kalan süre
-  const pix = document.createElement('div');
-  pix.className = 'run-life run-life--pixsy';
-  pix.hidden = true;
-  const pixIcon = document.createElement('canvas');
-  pixIcon.className = 'run-life__pixsy';
-  pixIcon.setAttribute('aria-hidden', 'true');
-  const pixCells = document.createElement('span');
-  pixCells.className = 'run-life__bar';
-  pixCells.setAttribute('aria-hidden', 'true');
-  for (let i = 0; i < LIFE_CELLS; i++) pixCells.append(document.createElement('i'));
-  const pixText = document.createElement('span');
-  pixText.className = 'run-life__time';
-  pix.append(pixIcon, pixCells, pixText);
-  let itemBudget: RunBudget | null = null;
-  let currentItem: () => { id: string; kind: PixsyKind; name: string } | null = () => null;
-  let drawnKind: PixsyKind | null = null;
-  const syncItem = () => {
-    const it = currentItem();
-    const show = !!itemBudget?.active && !!it && !!budget?.active;
-    pix.hidden = !show;
-    if (!show || !itemBudget || !it) return;
-    if (drawnKind !== it.kind) {
-      const src = itemSprite(it.kind);
-      pixIcon.width = src.width;
-      pixIcon.height = src.height;
-      const ctx = pixIcon.getContext('2d')!;
-      ctx.clearRect(0, 0, src.width, src.height);
-      ctx.drawImage(src, 0, 0);
-      drawnKind = it.kind;
-    }
-    const left = itemBudget.left(it.id);
-    const on = Math.ceil((left / itemBudget.limit) * LIFE_CELLS);
-    [...pixCells.children].forEach((c, i) => c.classList.toggle('is-on', i < on));
-    pix.classList.toggle('is-low', left <= 3 * 60);
-    pixText.textContent = `${clock(left)} left`;
-    pix.setAttribute('aria-label', `${it.name} energy: ${clock(left)} left today`);
-    pix.title = `${it.name} rides for ${clock(left)} more today, then flies back to its cushion`;
-  };
-
   const hint = document.createElement('p');
   hint.className = 'run-hint';
   hint.setAttribute('aria-live', 'polite');
-  wrap.append(btn, life, pix, hint);
+  wrap.append(btn, life, hint);
   stage.appendChild(wrap);
 
   // Uyanma sayacı: uyuyan hamsterin başının üstünde
@@ -153,6 +109,16 @@ export function mountRunButton(stage: HTMLElement, bg: PixelStormBackground): Ru
       rest.hidden = true;
       hint.textContent = HINTS[bg.hamsterState];
     }
+    fitHint();
+  };
+
+  // Kısa ekranda (ör. 1366×768, 1280×720) ipucu panelin alt kenarından taşıyıp yarım görünüyordu: sığmıyorsa gizlenir
+  const fitHint = () => {
+    hint.style.visibility = '';
+    if (!hint.textContent) return;
+    const r = hint.getBoundingClientRect();
+    const s = stage.getBoundingClientRect();
+    if (r.height > 0 && s.height > 0 && r.bottom > s.bottom - 4) hint.style.visibility = 'hidden';
   };
 
   const place = () => {
@@ -161,6 +127,7 @@ export function mountRunButton(stage: HTMLElement, bg: PixelStormBackground): Ru
     wrap.style.left = `${Math.round(g.x)}px`;
     wrap.style.top = `${Math.round(g.groundY + 18)}px`;
     placeRest();
+    fitHint();
   };
   const placeRest = () => {
     if (rest.hidden) return;
@@ -199,16 +166,9 @@ export function mountRunButton(stage: HTMLElement, bg: PixelStormBackground): Ru
       budget = b;
       b.onChange(() => {
         sync();
-        syncItem();
         placeRest();
       });
       sync();
-    },
-    setItemBudget(b, current) {
-      itemBudget = b;
-      currentItem = current;
-      b.onChange(syncItem);
-      syncItem();
     },
   };
 }
