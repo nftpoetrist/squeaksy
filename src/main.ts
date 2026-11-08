@@ -128,6 +128,7 @@ void (async () => {
           const id = inventory.equippedIn('back');
           return (id ? cardById(id)?.buddy : undefined) ?? null;
         },
+        stars: () => inventory.walletStars,
       })
     : null;
   // Sırttaki Pixsy değişince "Your Rank" kartındaki hamster de güncellenir

@@ -35,3 +35,7 @@ src/dev/deploy.ts
 src/dev/deploy.css
 src/dev/nft.ts
 src/dev/promo.ts
+launch.html
+src/dev/launch.ts
+early.html
+src/dev/early.ts

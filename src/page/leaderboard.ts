@@ -197,6 +197,11 @@ function rowEl(row: LeaderRow, isMe: boolean): HTMLElement {
 export interface LeaderboardMine {
   /** Oyuncunun sırtında takılı Pixsy (yoksa null): "Your Rank" kartındaki hamsterde görünür */
   buddy: () => PixsyKind | null;
+  /**
+   * Oyuncunun cüzdanındaki STARS, doğrudan zincirden (null = bilinmiyor). Sıralama zincir okuyucudan gelir ve son
+   * claim / mint'i birkaç on saniye geç görür; oyuncunun kendi satırı bu değerle hemen doğru gösterilir.
+   */
+  stars?: () => number | null;
 }
 
 export function mountLeaderboard(section: HTMLElement, backend: AuthBackend, signIn: () => void, mineSrc?: LeaderboardMine): { refreshMine: () => void } {
@@ -263,11 +268,13 @@ export function mountLeaderboard(section: HTMLElement, backend: AuthBackend, sig
 
   const state: { kind: LeaderKind; page: number; data: LeaderPage | null; error: boolean } = { kind: 'stars', page: 1, data: null, error: false };
 
+  /** "Your Rank" kartında gösterilen satır (render hesaplar; sunucu verisi state.data değiştirilmez) */
+  let shownMe: LeaderRow | null = null;
   const renderMine = () => {
     mine.replaceChildren();
     const h = el('h3', 'lb__mine-title');
     h.append(pixelIcon('trophy', 2), el('span', '', 'Your Rank'));
-    const me = state.data?.me ?? null;
+    const me = shownMe;
     const variant = me ? variantOf(me.hamster) : 'starter';
     // Giriş yapan oyuncu: oyundaki gibi sırtındaki Pixsy ile (takılı değilse Pixsy'siz); misafir: varsayılan
     const buddy = me && mineSrc ? mineSrc.buddy() : 'pixsy';
@@ -349,10 +356,15 @@ export function mountLeaderboard(section: HTMLElement, backend: AuthBackend, sig
     pinned.replaceChildren();
     // Her satır tek ve ardışık sıra numarası alır (eşit puanda iki "9." olmaz)
     const base = (state.page - 1) * PAGE_SIZE;
-    const rows = (state.data?.rows ?? []).map((r, i) => ({ ...r, rank: base + i + 1 }));
     const rawMe = state.data?.me ?? null;
-    const me = rawMe ? (rows.find((r) => r.handle === rawMe.handle) ?? rawMe) : null;
-    if (state.data) state.data.me = me;
+    // Kendi satırı: zincirdeki güncel bakiye (okuyucu henüz yetişmediyse). Yıldız sıralamasında sayfa buna göre yeniden dizilir.
+    const live = rawMe ? (mineSrc?.stars?.() ?? null) : null;
+    const patch = live !== null && rawMe !== null && live !== rawMe.stars;
+    let src = (state.data?.rows ?? []).map((r) => (patch && r.handle === rawMe!.handle ? { ...r, stars: live! } : r));
+    if (patch && state.kind === 'stars') src = [...src].sort((a, b) => b.stars - a.stars);
+    const rows = src.map((r, i) => ({ ...r, rank: base + i + 1 }));
+    const me = rawMe ? (rows.find((r) => r.handle === rawMe.handle) ?? (patch ? { ...rawMe, stars: live! } : rawMe)) : null;
+    shownMe = me;
     if (state.data?.partial) {
       // Tam sıralama henüz açık değil: oyuncu kendi satırını hemen görür
       const note = el('li', 'lb__empty lb__empty--note');
@@ -422,5 +434,6 @@ export function mountLeaderboard(section: HTMLElement, backend: AuthBackend, sig
     }, 1000 / 8);
   }).observe(section);
   render();
-  return { refreshMine: renderMine };
+  // Envanter değişince (cüzdan bakiyesi, sırttaki Pixsy) tablo da yeniden çizilir: kendi satırı hep güncel
+  return { refreshMine: render };
 }

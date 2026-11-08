@@ -51,7 +51,8 @@ export function mountAuthMenu(
   const refreshBalance = () => {
     if (!balanceEl) return;
     if (walletStars !== undefined) {
-      balanceEl.textContent = walletStars === null ? '0' : fmt.format(walletStars);
+      // null: henüz okunmadı (sayfa açılışı). Yanlış bir rakam yerine bekleme işareti; okununca gerçek bakiye
+      balanceEl.textContent = walletStars === null ? '…' : fmt.format(walletStars);
       balanceEl.parentElement!.title = 'STARS in your wallet';
     } else balanceEl.textContent = ledger.loaded ? fmt.format(getShownBalance()) : '…';
   };

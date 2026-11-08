@@ -136,6 +136,15 @@ export class Inventory {
     window.setInterval(() => {
       if (this.player && !document.hidden) void this.refreshWalletStars(!!this.linkedWallet);
     }, 60_000);
+    // Sekmeye geri dönünce / pencere odak alınca hemen (başka sekme ya da telefondaki işlem beklemeden yansısın); en sık 5 sn'de bir
+    let lastWake = 0;
+    const wake = () => {
+      if (!this.player || document.hidden || Date.now() - lastWake < 5000) return;
+      lastWake = Date.now();
+      void this.refreshWalletStars(!!this.linkedWallet);
+    };
+    document.addEventListener('visibilitychange', wake);
+    window.addEventListener('focus', wake);
     // Yalnızca adres / ağ değişince yeniden çiz (cüzdan durumu birkaç saniyede bir yoklanır)
     let key = '';
     ctx.wallet.onChange((st) => {
@@ -179,7 +188,11 @@ export class Inventory {
     this.refreshSoon();
   }
 
-  /** Cüzdandaki STARS: okuyucudan (hızlı), zincir modülü yüklüyse doğrudan zincirden */
+  /**
+   * Cüzdandaki STARS. Bağlı cüzdan biliniyorsa bakiye HER ZAMAN doğrudan zincirden okunur: zincir okuyucu son işlemleri
+   * birkaç on saniye geç işler, sayfa yenilenince ondan okunan bakiye son claim'leri göstermiyordu. Zincire ulaşılamazsa
+   * okuyucunun değeri kullanılır. direct: bağ okuyucuda henüz yoksa (ilk claim'den hemen sonra) zincirden de aranır.
+   */
   async refreshWalletStars(direct = false): Promise<void> {
     const ctx = this.mintCtx;
     const player = this.player;
@@ -190,11 +203,23 @@ export class Inventory {
       let linked = me?.wallet ?? null;
       // Okuyucu ilk claim'den sonra 10-60 sn geride kalabilir: cüzdan bağlıyken ya da claim'den hemen sonra zincirden bak
       const fromChain = !linked && !!me?.account && (direct || ctx.wallet.connected);
-      if (fromChain) linked = await (await loadMint()).chainLinkedWallet(me!.account);
+      if (fromChain) {
+        try {
+          linked = await (await loadMint()).chainLinkedWallet(me!.account);
+        } catch (err) {
+          console.warn('[Squeaksy] cüzdan bağı zincirden okunamadı', err);
+        }
+      }
       // Bağ zincirde kalıcı: bir kez bilindiyse eski bir okuma onu silemez
       linked ??= this.linkedWallet;
       let n = me?.walletStars ?? 0;
-      if (linked && (direct || fromChain)) n = await (await loadMint()).walletStars(linked);
+      if (linked) {
+        try {
+          n = await (await loadMint()).walletStars(linked);
+        } catch (err) {
+          console.warn('[Squeaksy] STARS zincirden okunamadı, zincir okuyucunun değeri gösteriliyor', err);
+        }
+      }
       // Bu arada daha yeni bir okuma başladıysa ya da oyuncu değiştiyse bu sonuç yok sayılır
       if (seq !== this.starsSeq || this.player !== player) return;
       this.linkedWallet = linked;
