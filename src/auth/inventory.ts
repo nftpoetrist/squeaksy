@@ -1,6 +1,11 @@
 import { cardById, CARDS, DEFAULT_EQUIPPED, ITEM_SLOTS, STARTER_HAMSTER, STARTER_OWNED, type ItemSlot } from '../collection/cards';
 import type { TokenLedger } from './ledger';
 import type { AuthBackend, Player } from './types';
+import type { MintDeps, MintStatus } from '../onchain/mint';
+
+/** Onchain mint için gerekenler (main.ts bağlar; yalnızca onchain modda) */
+export type MintContext = Omit<MintDeps, 'playerId'>;
+const loadMint = () => import('../onchain/mint');
 
 /** Sunucu hata mesajlarının oyuncuya gösterilen karşılıkları */
 const ERRORS: Record<string, string> = {
@@ -8,9 +13,12 @@ const ERRORS: Record<string, string> = {
   'already owned': 'You already own this hamster',
   'not for sale': 'This card is not for sale',
   'not owned': 'Buy this hamster first',
+  'card syncing': 'Your new card is still landing in the game. Try again in a few seconds.',
+  'item resting': 'This Pixsy is out of energy and resting. It is fully charged 24 hours after it ran out.',
   'not sellable': 'Starter cards cannot be sold',
   'sold out': 'Sold out! Every one of them has an owner.',
   'not authenticated': 'Sign in with X first',
+  'mint onchain': 'Cards are minted onchain with the STARS in your wallet.',
   'not an item for this slot': 'This item does not fit there',
   busy: 'One moment, finishing the last action…',
   // Sunucuda mağaza fonksiyonları henüz kurulmamışsa (PostgREST "function not found")
@@ -57,6 +65,10 @@ export class Inventory {
     return this.player !== null;
   }
 
+  get playerId(): string | null {
+    return this.player?.id ?? null;
+  }
+
   /** Koşan hamsterin kart kimliği */
   get active(): string {
     return this.activeId;
@@ -94,6 +106,188 @@ export class Inventory {
     this.supplyTimer = window.setTimeout(() => void this.refreshSupply(), 120_000);
   }
 
+  /** Onchain mint (null: eski satın alma) */
+  private mintCtx: MintContext | null = null;
+  /** Bağlı cüzdandaki STARS (onchain mod; null = henüz bilinmiyor / cüzdan yok) */
+  walletStars: number | null = null;
+  /** Bağlı cüzdan (onchain_me; claim edilmemişse null) */
+  linkedWallet: string | null = null;
+  /** Early oyuncu hediyesi (kart kimliği; yoksa null) */
+  giftCard: string | null = null;
+
+  get mintEnabled(): boolean {
+    return this.mintCtx !== null;
+  }
+
+  /** Cüzdan bağlı mı (onchain mod) */
+  get walletConnected(): boolean {
+    return !!this.mintCtx?.wallet.connected;
+  }
+
+  openWallet(): void {
+    this.mintCtx?.openWallet();
+  }
+
+  enableMint(ctx: MintContext): void {
+    this.mintCtx = ctx;
+    // Claim bitince cüzdandaki STARS değişti
+    window.addEventListener('squeaksy:claimed', (e) => this.onClaimed((e as CustomEvent<{ amount?: number }>).detail?.amount));
+    // Sayfa açıkken dakikada bir: başka sekme / cihazdaki işlemler ve geride kalan okuyucu da yansısın
+    window.setInterval(() => {
+      if (this.player && !document.hidden) void this.refreshWalletStars(!!this.linkedWallet);
+    }, 60_000);
+    // Yalnızca adres / ağ değişince yeniden çiz (cüzdan durumu birkaç saniyede bir yoklanır)
+    let key = '';
+    ctx.wallet.onChange((st) => {
+      const k = `${st.address ?? ''}:${st.chainId ?? ''}`;
+      if (k === key) return;
+      key = k;
+      this.changed(this.lastChangeByUser);
+      // Cüzdan sonradan bağlandıysa: bağ ve bakiye yeniden okunur
+      if (st.address && !this.linkedWallet) void this.refreshWalletStars();
+    });
+    if (this.player) void this.refreshWalletStars();
+  }
+
+  /**
+   * İşlemden hemen sonraki okuma, işlemi henüz görmemiş bir RPC sunucusuna denk gelebilir (eski bakiye, "bağlı değil").
+   * Bu süre içinde eski okumalar yok sayılır: claim sonrası bakiye min'in altına inmez, mint sonrası below'un altına
+   * inene kadar eski değer korunur.
+   */
+  private starsGuard: { until: number; min?: number; below?: number } | null = null;
+  private starsTimers: number[] = [];
+  private starsSeq = 0;
+
+  /** İşlem sonrası artan aralıklarla yeniden okur (RPC sunucuları ve zincir okuyucu yetişsin) */
+  private refreshSoon(): void {
+    for (const t of this.starsTimers) window.clearTimeout(t);
+    this.starsTimers = [1500, 4000, 8000, 15_000, 30_000, 60_000, 90_000].map((ms) => window.setTimeout(() => void this.refreshWalletStars(true), ms));
+  }
+
+  /** Claim zincirde onaylandı: rakam ve cüzdan bağı hemen güncellenir, sonra zincirden doğrulanır */
+  private onClaimed(amount: number | undefined): void {
+    const ctx = this.mintCtx;
+    if (!ctx || !this.player) return;
+    this.linkedWallet ??= ctx.wallet.state.address?.toLowerCase() ?? null;
+    if (amount && amount > 0) {
+      const min = (this.starsGuard?.min ?? this.walletStars ?? 0) + amount;
+      this.walletStars = min;
+      this.starsGuard = { until: Date.now() + 75_000, min };
+    }
+    this.changed(this.lastChangeByUser);
+    void this.refreshWalletStars(true);
+    this.refreshSoon();
+  }
+
+  /** Cüzdandaki STARS: okuyucudan (hızlı), zincir modülü yüklüyse doğrudan zincirden */
+  async refreshWalletStars(direct = false): Promise<void> {
+    const ctx = this.mintCtx;
+    const player = this.player;
+    if (!ctx || !player) return;
+    const seq = ++this.starsSeq;
+    try {
+      const me = await ctx.backend.fetchOnchainMe();
+      let linked = me?.wallet ?? null;
+      // Okuyucu ilk claim'den sonra 10-60 sn geride kalabilir: cüzdan bağlıyken ya da claim'den hemen sonra zincirden bak
+      const fromChain = !linked && !!me?.account && (direct || ctx.wallet.connected);
+      if (fromChain) linked = await (await loadMint()).chainLinkedWallet(me!.account);
+      // Bağ zincirde kalıcı: bir kez bilindiyse eski bir okuma onu silemez
+      linked ??= this.linkedWallet;
+      let n = me?.walletStars ?? 0;
+      if (linked && (direct || fromChain)) n = await (await loadMint()).walletStars(linked);
+      // Bu arada daha yeni bir okuma başladıysa ya da oyuncu değiştiyse bu sonuç yok sayılır
+      if (seq !== this.starsSeq || this.player !== player) return;
+      this.linkedWallet = linked;
+      const g = this.starsGuard;
+      if (g && Date.now() < g.until) {
+        if (g.min !== undefined && n < g.min) n = g.min;
+        if (g.below !== undefined && n >= g.below) n = this.walletStars ?? n;
+      } else if (g) this.starsGuard = null;
+      this.walletStars = n;
+      this.changed(this.lastChangeByUser);
+    } catch (err) {
+      console.warn('[Squeaksy] cüzdan STARS okunamadı', err);
+    }
+  }
+
+  /** Zincirde mint edildi ama oyun sunucusu (zincir okuyucu) henüz görmedi: takma / koşturma kısa süre bekler */
+  private syncing = new Set<string>();
+
+  /** Kart zincirde mint edildi (veya zaten cüzdandaydı): koleksiyona ekle */
+  private gotMinted(id: string, spent = false): void {
+    if (!this.owned.has(id)) {
+      this.owned.add(id);
+      this.supply[id] = (this.supply[id] ?? 0) + 1;
+    }
+    const ctx = this.mintCtx;
+    if (ctx && !this.syncing.has(id)) {
+      this.syncing.add(id);
+      void loadMint()
+        .then((m) => m.waitIndexed(ctx.backend, id))
+        .finally(() => this.syncing.delete(id));
+    }
+    // Mint STARS yaktı: bakiye düşene kadar eski okumalar yok sayılır (hediye STARS yakmaz)
+    if (spent && this.walletStars !== null) this.starsGuard = { until: Date.now() + 75_000, below: this.walletStars };
+    this.changed(true);
+    void this.refreshWalletStars(true);
+    this.refreshSoon();
+    window.setTimeout(() => void this.refreshSupply(), 15_000);
+  }
+
+  /**
+   * Onchain mint: cüzdandaki STARS yakılır, kart cüzdana gelir. onStatus adım adım bildirir.
+   * Başarılıysa true. Cancel ile bırakılırsa (cancelMint) arayüz serbest kalır; işlem sonradan onaylanırsa kart yine eklenir.
+   */
+  async mint(id: string, onStatus: (s: MintStatus) => void, gift = false): Promise<boolean> {
+    const ctx = this.mintCtx;
+    if (!ctx || !this.player) throw new Error('not authenticated');
+    if (this.busy) throw new Error('busy');
+    const playerId = this.player.id;
+    this.busy = true;
+    this.changed();
+    let ok = false;
+    try {
+      const m = await loadMint();
+      const run = gift ? m.runGift : m.runMint;
+      ok = await run({ ...ctx, playerId, linkedHint: this.linkedWallet, starsHint: this.walletStars }, id, onStatus, (card) => this.player?.id === playerId && this.gotMinted(card));
+    } finally {
+      this.busy = false;
+      if (ok) this.gotMinted(id, !gift);
+      else this.changed(true);
+    }
+    return ok;
+  }
+
+  /** Mint penceresi Cancel'a basıldı: bekleyen cüzdan isteğini bırak */
+  async cancelMint(): Promise<void> {
+    (await loadMint()).cancelMint();
+    this.busy = false;
+    this.changed();
+  }
+
+  /** Pixsy canı bitmiş mi (main.ts bağlar: Pixsy can sayacı) */
+  itemResting: (id: string) => boolean = () => false;
+
+  /**
+   * Sırttaki Pixsy'nin canı bitti: kendi uçma efektiyle minderine uçar (hamster koşmaya devam eder).
+   * Önce ekranda (tam bittiği an), sonra sunucuda: bekleyen bloklar yazılır, sırt boşaltılır.
+   */
+  async restItem(id: string): Promise<void> {
+    const card = cardById(id);
+    if (!card?.slot || this.equipped[card.slot] !== id) return;
+    const slot = card.slot;
+    this.equipped[slot] = null;
+    this.changed(true);
+    if (!this.player) return;
+    try {
+      await this.ledger.flush();
+      // Sunucu claim_tokens'ta zaten indirir; burada da yazılır (hamster tam o an durduysa birkaç saniye kalmış olabilir)
+      if (this.equipped[slot] === null) await this.backend.setEquipped(slot, null);
+    } catch (err) {
+      console.warn('[Squeaksy] Pixsy sırttan indirilemedi', err);
+    }
+  }
+
   /** Yuvadaki takılı eşya */
   equippedIn(slot: ItemSlot): string | null {
     return this.equipped[slot];
@@ -111,7 +305,10 @@ export class Inventory {
     const card = cardById(id);
     if (!card || card.kind !== 'Item' || !card.slot) throw new Error('not an item for this slot');
     if (!this.owned.has(id)) throw new Error('not owned');
-    if (this.busy) throw new Error('busy');
+    if (this.busy || this.loading) throw new Error('busy');
+    if (this.syncing.has(id) && this.equipped[card.slot] !== id) throw new Error('card syncing');
+    // Canı bitmiş Pixsy takılamaz (çıkarmak her zaman serbest)
+    if (this.equipped[card.slot] !== id && this.itemResting(id)) throw new Error('item resting');
     const slot = card.slot;
     const next = this.equipped[slot] === id ? null : id;
     if (this.player) {
@@ -141,10 +338,20 @@ export class Inventory {
     return CARDS.filter((c) => this.owned.has(c.id)).map((c) => c.id);
   }
 
+  /** Oyuncu verisi (kartlar, takılı eşyalar) yükleniyor: bu arada takma / değiştirme beklenir (yoksa yüklenen kayıt üstüne yazar) */
+  private loading = false;
+
   async setPlayer(p: Player | null): Promise<void> {
     this.player = p;
+    this.loading = p !== null;
     this.owned = new Set(STARTER_OWNED);
     this.paid = {};
+    this.walletStars = null;
+    this.linkedWallet = null;
+    this.giftCard = null;
+    this.starsGuard = null;
+    for (const t of this.starsTimers) window.clearTimeout(t);
+    this.starsTimers = [];
     this.activeId = STARTER_HAMSTER;
     this.equipped = { ...DEFAULT_EQUIPPED };
     this.changed();
@@ -167,8 +374,25 @@ export class Inventory {
       console.warn('[Squeaksy] takılı eşyalar yüklenemedi', err);
     }
     if (this.player !== p) return;
+    if (this.mintCtx) {
+      void this.refreshWalletStars();
+      void this.mintCtx.backend.fetchMyGift().then((g) => {
+        if (this.player !== p) return;
+        this.giftCard = g;
+        this.changed();
+      });
+      // Yarım kalmış mint (sayfa yenilendi): takibe devam et
+      const ctx = this.mintCtx;
+      try {
+        if (localStorage.getItem(`squeaksy.mintTx.${p.id}`))
+          void loadMint().then((m) => m.resumeMints({ ...ctx, playerId: p.id }, (card) => this.player === p && this.gotMinted(card)));
+      } catch {
+        /* depolama kapalı */
+      }
+    }
     // Sunucudaki aktif hamster yalnızca sahip olunuyorsa geçerli
     this.activeId = this.owned.has(p.activeHamster) ? p.activeHamster : STARTER_HAMSTER;
+    this.loading = false;
     this.changed();
   }
 
@@ -224,6 +448,8 @@ export class Inventory {
   async equip(id: string): Promise<void> {
     if (!this.player || this.busy || id === this.activeId) return;
     if (!this.owned.has(id) || cardById(id)?.kind !== 'Hamster') return;
+    if (this.loading) throw new Error('busy');
+    if (this.syncing.has(id)) throw new Error('card syncing');
     this.busy = true;
     this.changed();
     try {

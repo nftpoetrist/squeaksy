@@ -1,0 +1,739 @@
+/* ================================================================ Cüzdan (navbar butonu, çip, bağlanma penceresi)
+ * Yeni bir görsel dil yok: buton "Sign in with X" (.x-signin), çip profil kutusu (.profile__btn),
+ * menü profil menüsü (.profile__menu), pencere onay paneli (.px-modal) sınıflarını aynen kullanır.
+ * Burada yalnızca cüzdana özgü parçalar var. Seçiciler .nav / .px-modal ile başlar: style.css'ten sonra
+ * ya da önce yüklenmesi sonucu değiştirmez. */
+
+.nav__auth {
+  gap: 12px;
+}
+
+.nav__wallet,
+.nav__profile {
+  display: flex;
+  align-items: center;
+}
+
+.nav__wallet[hidden] {
+  display: none;
+}
+
+/* ------------------------------------------------- Bağlı değil: mavi piksel buton */
+.nav .wallet-btn__icon {
+  flex: none;
+  image-rendering: pixelated;
+}
+
+/* ------------------------------------------------- Bağlı: X profiliyle birleşik (ayrı çip yok)
+ * İkinci satır: yıldızlar yerine küçük yazıyla kısa cüzdan adresi + ağ noktası. */
+.nav .profile__wallet {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+
+/* Logo gelmediyse piksel cüzdan ikonu, zeminsiz (bağlanma penceresinde) */
+.wallet-logo--px {
+  display: grid;
+  place-items: center;
+}
+
+.wallet-logo--px canvas {
+  image-rendering: pixelated;
+}
+
+/* Ağ noktası: Sepolia yeşil, yanlış ağ kırmızı (piksel kare) */
+.wallet-chip__dot {
+  display: inline-block;
+  flex: none;
+  width: 6px;
+  height: 6px;
+  background: #46d873;
+  box-shadow: 0 0 6px rgba(70, 216, 115, 0.7);
+}
+
+.wallet-chip__dot.is-wrong,
+.nav .profile__btn.is-wrong .wallet-chip__dot {
+  background: #ff5b6b;
+  box-shadow: 0 0 6px rgba(255, 91, 107, 0.7);
+  animation: wallet-blink 1s steps(2) infinite;
+}
+
+/* Yanlış ağ: profil kutusunun kenarı kırmızı, adres satırı uyarı renginde */
+.nav .profile__btn.is-wrong {
+  box-shadow:
+    inset 0 0 0 2px #e2475a,
+    0 3px 0 #0b1640;
+}
+
+.nav .profile__btn.is-wrong .profile__wallet {
+  color: #ff9aa4;
+}
+
+/* ------------------------------------------------- Menü (profil menüsünün aynısı + adres) */
+/* Profil menüsünün içindeki cüzdan bölümü: kesik çizgiyle ayrılır, Sign out en altta */
+.nav .profile__menu:has(.wallet-menu) {
+  min-width: 236px;
+}
+
+.nav .wallet-menu {
+  margin: 0 0 8px;
+  padding: 10px 0 8px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.12);
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+.nav .wallet-menu__name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 4px 6px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ice-ink, #e6efff);
+}
+
+.nav .wallet-menu__addr {
+  margin: -4px 4px 10px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  word-break: break-all;
+  color: var(--text-dim);
+}
+
+.nav .wallet-menu button + button,
+.nav .wallet-menu button + a,
+.nav .wallet-menu a + button {
+  margin-top: 4px;
+}
+
+.nav .wallet-menu__link {
+  display: block;
+  padding: 8px 10px;
+  font-family: var(--pixel-font);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.nav .wallet-menu__link:hover,
+.nav .wallet-menu__link:focus-visible {
+  color: #0c0a1c;
+  background: var(--gold);
+  outline: none;
+}
+
+.nav .wallet-menu__hint {
+  max-width: 220px;
+  margin: 8px 4px 2px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  color: #ffb08a;
+}
+
+.nav .wallet-menu .wallet-menu__switch {
+  color: #0f2a6b;
+  background: linear-gradient(180deg, #8fe2ff 0%, #56cbfd 55%, #3fb7f7 100%);
+}
+
+/* ------------------------------------------------- Bağlanma penceresi: referans görseldeki el konsolunun aynısı
+ * Konsol kodla çizilen piksel sanatı (walletConsoleArt.ts, 218 × 166 hücre; masaüstünde 1 hücre = 3,5 px, Retina ekranda tam 7 piksel),
+ * keskin büyütülür. --u = konsol genişliğinin 1/290,667 i: liste ve yazılar görselle birlikte ölçeklenir.
+ * Işık: konsolun kendi kenar ışıkları + dışta mavi hare; parıltılar yanıp söner. */
+.px-modal.wconsole-back {
+  padding: 12px;
+}
+
+.wcon {
+  --u: calc(100cqw / 290.667);
+  position: relative;
+  width: min(763px, calc(100vw - 24px), calc((100svh - 24px) * 218 / 166));
+  aspect-ratio: 218 / 166;
+  container-type: inline-size;
+  font-family: var(--pixel-font);
+  color: #e9e9ee;
+  outline: none;
+  will-change: transform, opacity;
+  animation: wcon-in 0.24s cubic-bezier(0.2, 0.85, 0.25, 1) both;
+}
+
+.px-modal.wconsole-back {
+  animation: wcon-fade 0.18s ease-out both;
+}
+
+@keyframes wcon-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.965);
+  }
+}
+
+@keyframes wcon-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.wcon__art {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 calc(0.8 * var(--u)) rgba(90, 220, 255, 0.55)) drop-shadow(0 0 calc(7 * var(--u)) rgba(40, 130, 255, 0.5));
+}
+
+/* Hamster: konsolla aynı piksel boyu */
+.wcon__hamster-box {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+}
+
+.wcon__hamster-box canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 calc(0.6 * var(--u)) 0 rgba(5, 8, 29, 0.55));
+}
+
+/* Parıltılar */
+.wcon__spark {
+  position: absolute;
+  image-rendering: pixelated;
+  pointer-events: none;
+  filter: drop-shadow(0 0 calc(1.2 * var(--u)) rgba(120, 220, 255, 0.9));
+  animation: wallet-twinkle 2.2s steps(4) infinite;
+}
+
+/* Başlık: iki tonlu piksel yazı (üst beyaz, alt açık mavi), koyu dış hat, mavi gölge ve parlama */
+.wcon__title {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  font-size: calc(8.4 * var(--u));
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #f4f8ff;
+  background: linear-gradient(180deg, #ffffff 0 52%, #a8dcff 52% 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 calc(0.7 * var(--u)) 0 #2f64d8) drop-shadow(calc(0.45 * var(--u)) 0 0 #0a1040) drop-shadow(calc(-0.45 * var(--u)) 0 0 #0a1040)
+    drop-shadow(0 calc(-0.45 * var(--u)) 0 #0a1040) drop-shadow(0 0 calc(2.4 * var(--u)) rgba(140, 210, 255, 0.55));
+}
+
+/* SELECT / BACK */
+.wcon__label {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  font-size: calc(3.4 * var(--u));
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: #b4bdf0;
+  pointer-events: none;
+}
+
+/* A / B: parlayan camgöbeği harf */
+.wcon__letter {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  font-size: calc(7.2 * var(--u));
+  font-weight: 700;
+  line-height: 1;
+  color: #8af7fc;
+  text-shadow:
+    0 calc(0.6 * var(--u)) 0 #0d2f86,
+    0 0 calc(1.6 * var(--u)) rgba(120, 240, 255, 0.85);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------- Liste paneli (canlı) */
+.wcon__panel {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  padding: calc(4 * var(--u)) calc(4.7 * var(--u)) calc(2.2 * var(--u));
+  box-sizing: border-box;
+}
+
+.wcon__view {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #2a3a8c transparent;
+}
+
+.wcon .wallet-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: max(4px, calc(2 * var(--u)));
+  padding-left: calc(3.6 * var(--u));
+  margin-left: calc(-3.6 * var(--u));
+}
+
+/* Satır: referanstaki gibi koyu lacivert, ince kenar, hafif yuvarlak */
+.wcon .wallet-opt {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: max(30px, calc(20.5 * var(--u)));
+  padding: 0 max(6px, calc(6.3 * var(--u))) 0 0;
+  font-family: var(--pixel-font);
+  text-align: left;
+  color: #e9e9ee;
+  background: #13143b;
+  border: none;
+  border-radius: max(4px, calc(2.4 * var(--u)));
+  cursor: pointer;
+  box-shadow: inset 0 0 0 max(1px, calc(0.7 * var(--u))) #1f2050;
+}
+
+.wcon .wallet-opt:focus {
+  outline: none;
+}
+
+/* Seçili satır: buz mavisi kenar + solda altın ok */
+.wcon .wallet-opt.is-selected {
+  background: #171a4a;
+  box-shadow:
+    inset 0 0 0 max(1px, calc(0.7 * var(--u))) #5fc4ff,
+    0 0 max(6px, calc(4 * var(--u))) rgba(95, 196, 255, 0.35);
+}
+
+.wcon .wallet-opt::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: calc(-3.2 * var(--u));
+  width: max(5px, calc(2.4 * var(--u)));
+  height: max(7px, calc(3.4 * var(--u)));
+  background: #ffc93c;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+  filter: drop-shadow(0 0 2px rgba(255, 201, 60, 0.8));
+  opacity: 0;
+  translate: 0 -50%;
+}
+
+.wcon .wallet-opt.is-selected::before {
+  opacity: 1;
+  animation: wallet-nudge 0.6s steps(2) infinite;
+}
+
+.wcon .wallet-opt:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.wcon .wallet-opt:disabled {
+  cursor: default;
+}
+
+.wcon .wallet-opt__logobox {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: max(34px, calc(28.3 * var(--u)));
+  height: 100%;
+}
+
+/* Cüzdan logosu: sade, olduğu gibi */
+.wcon .wallet-opt__logo {
+  display: block;
+  width: max(18px, calc(13 * var(--u)));
+  height: max(18px, calc(13 * var(--u)));
+  object-fit: contain;
+}
+
+.wcon .wallet-logo--qr,
+.wcon .wallet-logo--px {
+  display: grid;
+  place-items: center;
+}
+
+.wcon .wallet-logo--qr canvas,
+.wcon .wallet-logo--px canvas {
+  width: 70% !important;
+  height: auto !important;
+  image-rendering: pixelated;
+}
+
+.wcon .wallet-opt__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: max(3px, calc(1.6 * var(--u)));
+  min-width: 0;
+  line-height: 1;
+}
+
+.wcon .wallet-opt__name {
+  overflow: hidden;
+  font-size: max(9px, calc(5.2 * var(--u)));
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.wcon .wallet-opt__sub {
+  overflow: hidden;
+  font-size: max(7px, calc(3.3 * var(--u)));
+  letter-spacing: 0.1em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #7e7fa6;
+}
+
+/* CONNECT: referanstaki iki tonlu mavi piksel buton */
+.wcon .wallet-opt__go {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: max(54px, calc(34.7 * var(--u)));
+  height: max(17px, calc(10.3 * var(--u)));
+  font-size: max(7px, calc(4 * var(--u)));
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #0d1541;
+  background: linear-gradient(
+    180deg,
+    #8ad8f6 0,
+    #8ad8f6 8%,
+    #46b6fe 8%,
+    #46b6fe 42%,
+    #3091e6 42%,
+    #3091e6 56%,
+    #46b6fe 56%,
+    #46b6fe 86%,
+    #1d5ee2 86%
+  );
+  border-radius: max(1px, calc(0.6 * var(--u)));
+}
+
+.wcon .wallet-opt.is-selected .wallet-opt__go {
+  filter: brightness(1.12);
+}
+
+.wcon .wallet-opt:disabled .wallet-opt__go {
+  color: #7e7fa6;
+  background: #1c1f55;
+}
+
+.wcon__hint {
+  margin: max(6px, calc(3 * var(--u))) 0 0;
+  font-size: max(8px, calc(3 * var(--u)));
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  color: #7e7fa6;
+}
+
+.wcon__hint a {
+  color: #8fe2ff;
+}
+
+.wcon__note {
+  flex: none;
+  margin: max(4px, calc(2 * var(--u))) 0 0;
+  font-size: max(7px, calc(2.7 * var(--u)));
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  text-align: center;
+  text-wrap: balance;
+  color: #c9d6ff;
+}
+
+.wcon__note.is-safe {
+  color: #5d6191;
+}
+
+.wcon.is-busy .wcon__note {
+  animation: px-blink 0.5s steps(2) infinite;
+}
+
+.wcon.is-error .wcon__note {
+  color: #ff8a8a;
+}
+
+/* Bekleme: zıplayan piksel cüzdan */
+.wcon .wallet-wait {
+  display: grid;
+  place-items: center;
+  height: 100%;
+}
+
+.wcon .wallet-wait canvas {
+  width: max(40px, calc(18 * var(--u))) !important;
+  height: auto !important;
+  image-rendering: pixelated;
+  animation: wallet-hop 0.8s steps(2) infinite;
+}
+
+/* QR / uygulama butonları */
+.wcon .wallet-qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: max(5px, calc(2.4 * var(--u)));
+  min-height: 100%;
+  justify-content: center;
+}
+
+.wcon .wallet-qr__title {
+  font-size: max(9px, calc(4.6 * var(--u)));
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.wcon .wallet-qr__code {
+  display: block;
+  width: max(110px, calc(62 * var(--u)));
+  height: auto;
+  image-rendering: pixelated;
+  box-shadow: 0 0 0 max(2px, calc(1 * var(--u))) #5fc4ff;
+}
+
+.wcon .wallet-apps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: max(4px, calc(2 * var(--u)));
+  width: 100%;
+}
+
+.wcon .wallet-app {
+  display: grid;
+  place-items: center;
+  height: max(26px, calc(13 * var(--u)));
+  padding: 0 4px;
+  font-size: max(7px, calc(3.3 * var(--u)));
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: #0d1541;
+  background: linear-gradient(180deg, #8ad8f6 0, #8ad8f6 8%, #46b6fe 8%, #46b6fe 86%, #1d5ee2 86%);
+  border-radius: max(1px, calc(0.6 * var(--u)));
+}
+
+.wcon .wallet-app--other {
+  color: #e9e9ee;
+  background: #13143b;
+  box-shadow: inset 0 0 0 max(1px, calc(0.7 * var(--u))) #1f2050;
+}
+
+.wcon .wallet-app.is-selected {
+  outline: max(1px, calc(0.7 * var(--u))) solid #5fc4ff;
+  outline-offset: 2px;
+}
+
+.wcon .wallet-copy {
+  padding: max(3px, calc(1.4 * var(--u))) max(6px, calc(3 * var(--u)));
+  font-family: var(--pixel-font);
+  font-size: max(7px, calc(2.8 * var(--u)));
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8fe2ff;
+  background: none;
+  border: none;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(143, 226, 255, 0.5);
+}
+
+.wcon .wallet-copy:focus {
+  outline: none;
+}
+
+.wcon .wallet-copy.is-selected {
+  color: #0d1541;
+  background: #8fe2ff;
+}
+
+/* ------------------------------------------------- Görseldeki tuşlar: görünmez gerçek butonlar */
+.wcon__hit {
+  position: absolute;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Dokunmatik ekranda küçük tuşlar kolay basılsın (görünmez geniş alan) */
+.wcon__hit::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+
+.wcon__hit--round {
+  border-radius: 50%;
+}
+
+.wcon__hit--pill {
+  border-radius: 999px;
+}
+
+.wcon__hit--square {
+  border-radius: 14%;
+}
+
+.wcon__hit--up {
+  border-radius: 18% 18% 0 0;
+}
+
+.wcon__hit--down {
+  border-radius: 0 0 18% 18%;
+}
+
+.wcon__hit--left {
+  border-radius: 18% 0 0 18%;
+}
+
+.wcon__hit--right {
+  border-radius: 0 18% 18% 0;
+}
+
+.wcon__hit:hover {
+  background: rgba(150, 215, 255, 0.12);
+}
+
+.wcon__hit:focus-visible {
+  outline: 2px solid #8fe2ff;
+  outline-offset: 2px;
+}
+
+/* Basıldı: tuş kararır ve hafif çöker */
+.wcon__hit.is-pressed,
+.wcon__hit:active {
+  background: rgba(0, 0, 30, 0.38);
+  box-shadow: inset 0 calc(0.8 * var(--u)) 0 rgba(0, 0, 30, 0.45);
+}
+
+@keyframes wallet-hop {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes wallet-twinkle {
+  0%,
+  100% {
+    opacity: 1;
+    scale: 1;
+  }
+  50% {
+    opacity: 0.35;
+    scale: 0.7;
+  }
+}
+
+@keyframes wallet-nudge {
+  50% {
+    translate: 2px -50%;
+  }
+}
+
+@keyframes wallet-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ------------------------------------------------- Dar ekranlar */
+/* Masaüstünde yer açma. Menü bağlantıları her genişlikte tam ortada kalır (navbar 1fr | menü | 1fr):
+   cüzdan butonu görünürken profil kutusu 1680 px altında yalnızca avatar (sitenin 901-1280 px kuralının aynısı;
+   @kullanıcı adı profil menüsünde, yıldızlar oyun panelinde), buton 1440 px altında kısa "Connect",
+   bağlı çip 1365 px altında yalnızca logo. */
+@media (min-width: 1001px) and (max-width: 1679px) {
+  .nav:has(.nav__wallet:not([hidden])) .nav__profile .profile__info {
+    display: none;
+  }
+  .nav:has(.nav__wallet:not([hidden])) .nav__profile .profile__btn {
+    padding: 4px;
+  }
+}
+
+@media (min-width: 1001px) and (max-width: 1439px) {
+  .nav:has(.nav__wallet:not([hidden])) .wallet-btn .x-signin__long {
+    display: none;
+  }
+}
+
+
+/* Küçük tablet yatay (901-1100 px): buton yalnızca ikon (telefondaki gibi), aralıklar biraz daralır */
+@media (min-width: 1001px) and (max-width: 1100px) {
+  .nav:has(.nav__wallet:not([hidden])) {
+    gap: 8px;
+  }
+  .nav:has(.nav__wallet:not([hidden])) .nav__links a {
+    padding-left: 6px;
+    padding-right: 7px;
+  }
+  .nav:has(.nav__wallet:not([hidden])) .nav__auth {
+    gap: 8px;
+  }
+}
+
+/* 901-1200 px: "Connect" yazısı sığmaz, buton yalnızca ikon (title / aria-label: Connect wallet) */
+@media (min-width: 1001px) and (max-width: 1200px) {
+  .nav .wallet-btn > span {
+    display: none;
+  }
+  .nav .wallet-btn {
+    padding: 8px 9px;
+  }
+}
+
+/* Telefon: navbar'da yalnızca ikon (yazı sığmaz); profil kutusu da zaten yalnızca avatar */
+@media (max-width: 720px) {
+  .nav .wallet-btn > span {
+    display: none;
+  }
+  .nav .wallet-btn {
+    padding: 8px 9px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .px-modal.wconsole-back,
+  .wcon,
+  .wcon .wallet-wait canvas,
+  .wcon .wallet-opt.is-selected::before,
+  .wcon__spark,
+  .wcon.is-busy .wcon__note,
+  .wallet-chip__dot.is-wrong,
+  .nav .profile__btn.is-wrong .wallet-chip__dot {
+    animation: none;
+  }
+}
+
+/* Tablet (hamburger menü): Connect butonu yalnızca ikon, profil + yıldız rozeti sığsın */
+@media (max-width: 1000px) {
+  .nav .wallet-btn > span {
+    display: none;
+  }
+  .nav .wallet-btn {
+    padding: 8px 9px;
+  }
+}

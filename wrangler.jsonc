@@ -1,9 +1,22 @@
-// Cloudflare Workers (statik site): `npm run build` çıktısı dist/ olduğu gibi yayınlanır.
-// Sunucu kodu yok; oyunun arka ucu Supabase'de.
+// Cloudflare Workers: `npm run build` çıktısı dist/ statik olarak yayınlanır (ASSETS).
+// worker/index.ts yalnızca /api/* isteklerini karşılar (claim fişi, kart NFT bilgisi); oyunun arka ucu Supabase'de.
+// Gizli değer SIGNER_PRIVATE_KEY yalnızca Cloudflare panelinde Secret olarak durur (repoda ASLA).
+// SUPABASE_URL ve SUPABASE_ANON_KEY panelde (Secret) girilir, repoya girmez; keep_vars korur. Kontrat adresleri aşağıda (herkese açık).
 {
   "name": "squeaksy",
   "compatibility_date": "2026-10-01",
+  "main": "worker/index.ts",
   "assets": {
-    "directory": "./dist"
+    "directory": "./dist",
+    "binding": "ASSETS"
+  },
+  "keep_vars": true,
+  "vars": {
+    "CHAIN_ID": "11155111",
+    "SEPOLIA_RPC_URL": "https://ethereum-sepolia-rpc.publicnode.com",
+    "SEPOLIA_RPC_FALLBACKS": "https://sepolia.gateway.tenderly.co",
+    // Yayın kontratları (Sepolia, herkese açık adresler; Etherscan'de doğrulandı)
+    "STARS_ADDRESS": "0xf8f040fd7c774d722398a468c7e4bf09dc15d52a",
+    "CARDS_ADDRESS": "0x16763e482ca724807dd2345c4dac0c386634a3ac"
   }
 }

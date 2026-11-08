@@ -1,0 +1,626 @@
+/* Oyun paneli: tek satır [ses] [yıldız sayacı] [Claim]. Claim en sağda, sayaçla aynı yükseklikte;
+   durum kutusu satırın altında. Sayaç Claim'in genişliği kadar sola kayar (--claim-w, claimButton.ts). */
+#world.has-claim .token-hud {
+  right: calc(24px + var(--claim-w, 0px));
+}
+
+.claim {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 3;
+  /* Kendi katmanı: animasyonlar sahneyi (tuvali) yeniden boyatmaz; MetaMask penceresi kapanınca kararma olmaz */
+  isolation: isolate;
+  transform: translateZ(0);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: min(280px, 70%);
+  font-family: var(--pixel-font);
+}
+
+.claim[hidden] {
+  display: none;
+}
+
+/* Premium piksel oyun butonu: basamaklı altın bantlar, koyu kahve dış hat, sol üst ışık / sağ alt gölge,
+   altında kalın taban (basınca içine gömülür). Yüksekliği sayaçla eşitlenir (claimButton.ts). */
+.claim__btn {
+  --ink: #2a1405;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  justify-content: center;
+  min-width: 132px;
+  padding: 0 18px 0 13px;
+  font-family: var(--pixel-font);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #3a1a04;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  overflow: hidden;
+  isolation: isolate;
+  /* Basamaklı altın: üstte açık, ortada derin, altta koyu bant (yumuşak geçiş yok) */
+  background: linear-gradient(
+    180deg,
+    #fff1b0 0 10%,
+    #ffd75a 10% 34%,
+    #f6bd33 34% 62%,
+    #e29d22 62% 84%,
+    #c27a16 84% 100%
+  );
+  box-shadow:
+    inset 3px 3px 0 rgba(255, 250, 220, 0.75),
+    inset -3px -3px 0 #a5620f,
+    0 0 0 3px var(--ink),
+    0 6px 0 3px #6e3a0a,
+    0 6px 0 6px var(--ink),
+    0 10px 18px rgba(0, 0, 0, 0.45);
+  transform: translateY(-3px);
+  transition: transform 0.08s steps(2);
+}
+
+.claim__label {
+  position: relative;
+  z-index: 2;
+  /* Kabartma: altta koyu, üstte ince açık çizgi */
+  text-shadow:
+    0 2px 0 rgba(255, 238, 170, 0.55),
+    0 -1px 0 rgba(90, 40, 0, 0.35);
+}
+
+/* #world içindeki tuvaller sahne katmanı olarak "absolute"; bu ikon akışta kalmalı (sayaç ikonu gibi) */
+#world .claim__star {
+  position: relative;
+  inset: auto;
+  z-index: 2;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 2px 0 rgba(42, 20, 5, 0.55));
+}
+
+/* Hazır (claim edilecek yıldız var): yıldız hafifçe zıplar, çevrede altın ışık nabzı.
+   Işık ayrı bir katman (::before), yalnızca opaklığı canlanır: yeniden boyama yok */
+.claim__glow {
+  position: absolute;
+  inset: -10px -10px -16px;
+  z-index: -1;
+  background: radial-gradient(closest-side, rgba(255, 201, 60, 0.45), rgba(255, 201, 60, 0));
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity;
+}
+
+.claim__wrapbtn {
+  position: relative;
+}
+
+.claim__wrapbtn.is-ready .claim__glow {
+  animation: claim-glow 2.4s ease-in-out infinite;
+}
+
+.claim__btn.is-ready .claim__star {
+  animation: claim-bob 1.2s steps(2) infinite;
+}
+
+.claim__btn.is-ready:hover {
+  background: linear-gradient(180deg, #fff6c8 0 10%, #ffe070 10% 34%, #ffc93c 34% 62%, #eaa62a 62% 84%, #c98019 84% 100%);
+  transform: translateY(-5px);
+}
+
+.claim__btn.is-ready:hover .claim__star {
+  animation: claim-spin 0.6s steps(6) infinite;
+}
+
+/* Basıldı: tabanın içine gömülür */
+.claim__btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    inset 3px 3px 0 rgba(255, 250, 220, 0.6),
+    inset -3px -3px 0 #a5620f,
+    0 0 0 3px var(--ink),
+    0 1px 0 3px #6e3a0a,
+    0 1px 0 6px var(--ink);
+}
+
+.claim__btn:focus-visible {
+  outline: 2px solid #fff6c8;
+  outline-offset: 7px;
+}
+
+/* Üzerinden geçen piksel parıltı (çapraz, basamaklı hareket) */
+.claim__shine {
+  position: absolute;
+  inset: -40% auto -40% 0;
+  z-index: 1;
+  width: 28%;
+  background: linear-gradient(90deg, transparent 0 20%, rgba(255, 255, 240, 0.65) 20% 45%, rgba(255, 255, 255, 0.95) 45% 60%, rgba(255, 255, 240, 0.5) 60% 80%, transparent 80%);
+  transform: translateX(-160%) skewX(-22deg);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.claim__btn.is-ready .claim__shine {
+  animation: claim-shine 3.6s steps(14) infinite;
+}
+
+/* Köşelerde yanıp sönen minik piksel yıldızlar */
+.claim__spark {
+  position: absolute;
+  z-index: 2;
+  width: 7px;
+  height: 7px;
+  background:
+    linear-gradient(#fff, #fff) center / 7px 1px no-repeat,
+    linear-gradient(#fff, #fff) center / 1px 7px no-repeat;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.claim__spark--0 {
+  top: 5px;
+  right: 7px;
+}
+
+.claim__spark--1 {
+  bottom: 7px;
+  right: 30%;
+}
+
+.claim__spark--2 {
+  top: 7px;
+  left: 42%;
+}
+
+.claim__btn.is-ready .claim__spark {
+  animation: claim-twinkle 2.4s steps(3) infinite;
+}
+
+.claim__btn.is-ready .claim__spark--1 {
+  animation-delay: 0.8s;
+}
+
+.claim__btn.is-ready .claim__spark--2 {
+  animation-delay: 1.6s;
+}
+
+/* Claim edilecek yıldız yok: sönük ama şık (koyu zemin, soluk altın) */
+.claim__btn:disabled {
+  cursor: default;
+  color: rgba(255, 220, 140, 0.5);
+  background: linear-gradient(180deg, #2a2140 0 12%, #1d1733 12% 70%, #161029 70% 100%);
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 220, 140, 0.12),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.35),
+    0 0 0 3px #120d24,
+    0 4px 0 3px #0b0818,
+    0 4px 0 5px #120d24;
+  transform: translateY(-2px);
+}
+
+.claim__btn:disabled:not(.is-busy) .claim__star {
+  filter: grayscale(0.75) brightness(0.7);
+  opacity: 0.7;
+}
+
+.claim__btn:disabled .claim__label {
+  text-shadow: none;
+}
+
+/* Gönderiliyor: altın kalır, yıldız sakince döner (yanıp sönme yok) */
+.claim__btn.is-busy {
+  cursor: progress;
+  color: #3a1a04;
+  background: linear-gradient(180deg, #fff1b0 0 10%, #ffd75a 10% 34%, #f6bd33 34% 62%, #e29d22 62% 84%, #c27a16 84% 100%);
+  box-shadow:
+    inset 3px 3px 0 rgba(255, 250, 220, 0.75),
+    inset -3px -3px 0 #a5620f,
+    0 0 0 3px var(--ink),
+    0 4px 0 3px #6e3a0a,
+    0 4px 0 6px var(--ink);
+}
+
+
+.claim__btn.is-busy .claim__star {
+  animation: claim-spin 0.8s steps(6) infinite;
+}
+
+@keyframes claim-glow {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes claim-bob {
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes claim-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes claim-shine {
+  0% {
+    transform: translateX(-160%) skewX(-22deg);
+    opacity: 1;
+  }
+  40%,
+  100% {
+    transform: translateX(480%) skewX(-22deg);
+    opacity: 1;
+  }
+}
+
+@keyframes claim-twinkle {
+  0%,
+  60%,
+  100% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Durum kutusu: Claim butonuyla aynı dil. Koyu dış hat, basamaklı mor-lacivert zemin, altın-kahve iç kenar,
+   sol üst ışık, altta taban. Yanıp sönen hiçbir şey yok: o anki adım yumuşakça parlar, çubukta blok sakince akar. */
+.claim__box {
+  --ink: #2a1405;
+  position: relative;
+  display: grid;
+  gap: 9px;
+  width: 268px;
+  max-width: 100%;
+  margin-top: 6px;
+  padding: 11px 13px 13px;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  line-height: 1.6;
+  color: #f3e6c4;
+  background: linear-gradient(180deg, #2b2149 0 9%, #211a3c 9% 58%, #1a1430 58% 100%);
+  box-shadow:
+    inset 0 0 0 2px #7a5216,
+    inset 2px 2px 0 2px rgba(255, 220, 140, 0.16),
+    0 0 0 3px var(--ink),
+    0 5px 0 3px #0b0818,
+    0 5px 0 5px var(--ink),
+    0 12px 22px rgba(0, 0, 0, 0.5);
+}
+
+.claim__box[hidden] {
+  display: none;
+}
+
+.claim__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#world .claim__icon {
+  position: relative;
+  inset: auto;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 1px 0 rgba(42, 20, 5, 0.7));
+}
+
+.claim__title {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ffd75a;
+  text-shadow: 0 2px 0 var(--ink);
+}
+
+.claim__box.is-done .claim__title {
+  color: #7ff0a4;
+}
+
+.claim__box.is-error .claim__title {
+  color: #ffb08a;
+}
+
+/* Adımlar: hazırlık · cüzdan · Sepolia */
+.claim__steps {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.claim__step {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 5px;
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #6f6597;
+}
+
+/* Adım işareti: 8 px piksel kare */
+.claim__step::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: #3a3060;
+  box-shadow: 0 0 0 1px var(--ink);
+}
+
+.claim__step.is-done {
+  color: #9fe6b8;
+}
+
+.claim__step.is-done::before {
+  background: #46d873;
+}
+
+.claim__step.is-now {
+  color: #ffd75a;
+}
+
+.claim__step.is-now::before {
+  background: #ffc93c;
+  box-shadow:
+    0 0 0 1px var(--ink),
+    0 0 6px rgba(255, 201, 60, 0.8);
+  animation: claim-step 1.6s ease-in-out infinite;
+}
+
+.claim__step.is-fail {
+  color: #ffb08a;
+}
+
+.claim__step.is-fail::before {
+  background: #e2475a;
+}
+
+/* Piksel ilerleme çubuğu */
+.claim__bar {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 8px, rgba(0, 0, 0, 0.35) 8px 10px),
+    #120d24;
+  box-shadow:
+    0 0 0 2px var(--ink),
+    inset 0 2px 0 rgba(0, 0, 0, 0.4);
+}
+
+.claim__bar i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 30%;
+  will-change: transform;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 8px, rgba(90, 40, 0, 0.35) 8px 10px),
+    linear-gradient(180deg, #fff1b0 0 25%, #ffc93c 25% 70%, #d8961e 70%);
+}
+
+.claim__box.is-busy .claim__bar i {
+  animation: claim-flow 1.8s steps(18) infinite;
+}
+
+.claim__box.is-done .claim__bar i {
+  width: 100%;
+  transform: none;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 8px, rgba(0, 60, 20, 0.35) 8px 10px),
+    linear-gradient(180deg, #b8ffd0 0 25%, #46d873 25% 70%, #2a9a50 70%);
+}
+
+.claim__box.is-error .claim__bar i {
+  width: 100%;
+  transform: none;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 8px, rgba(0, 0, 0, 0.3) 8px 10px),
+    linear-gradient(180deg, #ff9aa4 0 25%, #c8323e 25% 70%, #8e1424 70%);
+  opacity: 0.55;
+}
+
+.claim__msg {
+  margin: 0;
+  color: #f3e6c4;
+}
+
+.claim__box.is-error .claim__msg {
+  color: #ffd0b8;
+}
+
+.claim__big {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #ffd75a;
+  text-shadow: 0 2px 0 var(--ink);
+}
+
+#world .claim__icon--sm {
+  width: 22px;
+  height: 22px;
+}
+
+.claim__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.claim__box a {
+  color: #8fe2ff;
+}
+
+/* Vazgeç: koyu piksel buton (durum kutusu ailesi) */
+.claim__cancel {
+  padding: 5px 9px 6px;
+  font-family: var(--pixel-font);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #f3e6c4;
+  background: #2b2149;
+  border: none;
+  cursor: pointer;
+  box-shadow:
+    0 0 0 2px var(--ink),
+    0 3px 0 2px #0b0818,
+    0 3px 0 4px var(--ink);
+  transform: translateY(-2px);
+}
+
+.claim__cancel:hover {
+  background: #3a2c62;
+}
+
+.claim__cancel:active {
+  transform: translateY(1px);
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+.claim__msg--hint {
+  color: #ffd75a;
+}
+
+/* Cüzdana ekle: küçük altın piksel buton */
+.claim__add {
+  padding: 5px 9px 6px;
+  font-family: var(--pixel-font);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #3a1a04;
+  background: linear-gradient(180deg, #fff1b0 0 18%, #ffd75a 18% 60%, #e29d22 60%);
+  border: none;
+  cursor: pointer;
+  box-shadow:
+    0 0 0 2px var(--ink),
+    0 3px 0 2px #6e3a0a,
+    0 3px 0 4px var(--ink);
+  transform: translateY(-2px);
+}
+
+.claim__add:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 0 0 2px var(--ink),
+    0 0 0 2px #6e3a0a;
+}
+
+.claim__close {
+  position: relative;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  background: #2b2149;
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+.claim__close::before,
+.claim__close::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 4px;
+  width: 10px;
+  height: 2px;
+  background: #f3e6c4;
+  transform: rotate(45deg);
+}
+
+.claim__close::after {
+  transform: rotate(-45deg);
+}
+
+.claim__close:hover {
+  background: #3a2c62;
+}
+
+@keyframes claim-flow {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(334%);
+  }
+}
+
+@keyframes claim-step {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Yatay telefon: sayaç gibi üstten 8 px, daha küçük */
+@media (orientation: landscape) and (max-height: 500px) {
+  .claim {
+    top: 8px;
+  }
+  .claim__btn {
+    gap: 7px;
+    min-width: 108px;
+    padding: 0 12px 0 9px;
+    font-size: 11px;
+  }
+  .claim__star {
+    width: 18px;
+    height: 18px;
+  }
+  .claim__box {
+    width: 240px;
+    gap: 7px;
+    padding: 9px 11px 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .claim__btn,
+  .claim__btn *,
+  .claim__box,
+  .claim__box * {
+    animation: none !important;
+  }
+}

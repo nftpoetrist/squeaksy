@@ -49,6 +49,8 @@ export interface BackgroundConfig {
     shake: boolean;
     shakePixels: number;
     sparkCount: number;
+    /** Hava ne olursa olsun bu kadar saniyede bir rastgele bir blok bulutuna yıldırım (şimşek + gök gürültüsü). 0 = kapalı */
+    ambientEverySeconds: number;
   };
   particles: { maxMotes: number; maxSparks: number };
   /** blockClouds: gökyüzündeki blok bulutu kümesi sayısı */
@@ -76,8 +78,9 @@ export interface BackgroundConfig {
 export const DEFAULT_CONFIG: BackgroundConfig = {
   seed: 9000,
   pixel: { scale: 'auto', autoDivisor: 270, minScale: 2, maxScale: 6 },
-  // 120 Hz ekranlarda (ProMotion vb.) akıcı; 60 Hz ekranda rAF zaten 60'ta kalır
-  maxFps: 120,
+  // Piksel sahne için 60 kare yeterli. 120 Hz ekranlarda (ProMotion) 120'de çizmek işlemciyi / ekran kartını iki kat
+  // yoruyor ve Mac'i ısıtıyordu; görsel fark yok.
+  maxFps: 60,
   quality: 'auto',
   animationSpeed: 1,
   parallax: 0,
@@ -137,6 +140,7 @@ export const DEFAULT_CONFIG: BackgroundConfig = {
     shake: false,
     shakePixels: 2,
     sparkCount: 36,
+    ambientEverySeconds: 30,
   },
   particles: { maxMotes: 45, maxSparks: 260 },
   chain: { blockClouds: 6, pulses: true },

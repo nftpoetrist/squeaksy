@@ -22,7 +22,7 @@ export function mountHutMenu(
   ledger: TokenLedger,
   signIn: () => void,
   opts: { onBuy?: (id: string) => void } = {},
-): { refresh: () => void; open: (id: string) => void; setBudget: (b: RunBudget) => void } {
+): { refresh: () => void; open: (id: string) => void; setBudget: (b: RunBudget) => void; setItemBudget: (b: RunBudget) => void } {
   const layer = document.createElement('div');
   layer.className = 'hut-ui';
   stage.appendChild(layer);
@@ -37,6 +37,8 @@ export function mountHutMenu(
   let status = '';
   /** Hamster canları: canı biten hamsterin yuvasında canının dolmasına kalan süre */
   let budget: RunBudget | null = null;
+  /** Pixsy canları (sırt eşyaları) */
+  let itemBudget: RunBudget | null = null;
   const restTags = new Map<string, HTMLElement>();
   let restingKey = '';
 
@@ -181,9 +183,12 @@ export function mountHutMenu(
       btn.textContent = 'Sign in with X';
       btn.onclick = () => signIn();
     } else if (owned && isItem) {
-      // Sahip olunan Pixsy: hamstere tak (sırttaki eskisi köşeye uçar)
-      btn.textContent = `Put on ${c.name}`;
-      btn.disabled = inv.busy;
+      // Sahip olunan Pixsy: hamstere tak (sırttaki eskisi köşeye uçar). Canı bittiyse dinlenir, takılamaz.
+      const resting = itemBudget?.isResting(c.id) ?? false;
+      if (resting) need = `Resting · full energy in ${clock(itemBudget!.wakeInMs(c.id) / 1000)}`;
+      else if (itemBudget?.active) need = `Energy · ${clock(itemBudget.left(c.id))} of riding left`;
+      btn.textContent = resting ? `${c.name} is resting` : `Put on ${c.name}`;
+      btn.disabled = inv.busy || resting;
       btn.onclick = async () => {
         try {
           await inv.toggleItem(c.id);
@@ -209,10 +214,13 @@ export function mountHutMenu(
       };
     } else {
       // Satın alma Hamsters bölümündeki kartta yapılır: sayfa o karta kayar
-      const have = ledger.total;
-      btn.textContent = `Buy · ${fmt.format(price)} stars`;
+      // Onchain: cüzdandaki STARS ile mint (Market'te)
+      const have = inv.mintEnabled ? (inv.walletStars ?? Infinity) : ledger.total;
+      const isGift = inv.giftCard === c.id;
+      btn.textContent = isGift ? 'Your gift · Free' : inv.mintEnabled ? `Mint · ${fmt.format(price)} STARS` : `Buy · ${fmt.format(price)} stars`;
       btn.classList.add('is-buy');
-      if (inv.signedIn && have < price) need = `You need ${fmt.format(price - have)} more stars`;
+      if (isGift) need = 'A thank you for being early. Claim it in the Market.';
+      else if (inv.signedIn && have < price) need = inv.mintEnabled ? `You need ${fmt.format(price - have)} more STARS in your wallet` : `You need ${fmt.format(price - have)} more stars`;
       btn.onclick = () => {
         close();
         opts.onBuy?.(c.id);
@@ -290,5 +298,21 @@ export function mountHutMenu(
     });
     refresh();
   };
-  return { refresh, open, setBudget };
+  const setItemBudget = (b: RunBudget) => {
+    itemBudget = b;
+    let key = '';
+    b.onChange(() => {
+      // Açık pencere bir Pixsy'ninse: süresi ve dinlenme durumu canlı güncellenir
+      if (!openId || cardById(openId)?.kind !== 'Item' || inv.busy || status) return;
+      const k = `${openId}:${b.isResting(openId)}`;
+      if (k !== key) {
+        key = k;
+        renderPop();
+        return;
+      }
+      const st = pop.querySelector('.hut-pop__status');
+      if (st) st.textContent = b.isResting(openId) ? `Resting · full energy in ${clock(b.wakeInMs(openId) / 1000)}` : `Energy · ${clock(b.left(openId))} of riding left`;
+    });
+  };
+  return { refresh, open, setBudget, setItemBudget };
 }

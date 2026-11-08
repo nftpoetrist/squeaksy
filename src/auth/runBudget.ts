@@ -1,8 +1,11 @@
 import type { RunBudgetState } from './types';
+import { ONCHAIN } from '../onchain/config';
 
-/** Her hamsterin canı: 24 saatte en fazla 2 saat koşu (sunucudaki claim_tokens ile aynı kural) */
-export const RUN_LIMIT_SECONDS = 2 * 60 * 60;
+/** Her hamsterin canı (sunucudaki claim_tokens ile aynı kural): onchain modda 24 saatte 15 dakika, eskisinde 2 saat */
+export const RUN_LIMIT_SECONDS = ONCHAIN ? 15 * 60 : 2 * 60 * 60;
 export const RUN_WINDOW_MS = 24 * 60 * 60 * 1000;
+/** Her Pixsy'nin (sırt eşyası) canı: 24 saatte 15 dakika, yalnızca koşan hamsterin sırtındayken azalır (claim_tokens) */
+export const ITEM_LIMIT_SECONDS = 15 * 60;
 
 /**
  * Sunucu zaman damgası → ms. Postgres mikrosaniye (6 hane) döndürür; Safari (iPhone'daki tüm tarayıcılar)
@@ -28,7 +31,10 @@ interface Entry {
  */
 export class RunBudget {
   private map = new Map<string, Entry>();
-  private activeId = 'starter-hamster';
+  private activeId: string | null = 'starter-hamster';
+
+  /** limit: tam can (sn). Hamsterler this.limit, Pixsy'ler ITEM_LIMIT_SECONDS. */
+  constructor(readonly limit = RUN_LIMIT_SECONDS) {}
   /** Sunucudan bilgi geldi mi (misafir ya da eski şema: sınır yok) */
   private known = false;
   private listeners: Array<() => void> = [];
@@ -44,12 +50,12 @@ export class RunBudget {
   private entry(id: string): Entry {
     let e = this.map.get(id);
     if (!e) {
-      e = { left: RUN_LIMIT_SECONDS, resetAt: null };
+      e = { left: this.limit, resetAt: null };
       this.map.set(id, e);
     }
     // Pencere bittiyse can yenilenir
     if (e.resetAt !== null && Date.now() >= e.resetAt) {
-      e.left = RUN_LIMIT_SECONDS;
+      e.left = this.limit;
       e.resetAt = null;
     }
     return e;
@@ -85,20 +91,20 @@ export class RunBudget {
     this.changed();
   }
 
-  /** Koşan hamster değişti */
-  setActive(id: string): void {
+  /** Koşan hamster (ya da sırttaki Pixsy; null = sırt boş) değişti */
+  setActive(id: string | null): void {
     if (id === this.activeId) return;
     this.activeId = id;
     this.changed();
   }
 
   get activeHamster(): string {
-    return this.activeId;
+    return this.activeId ?? '';
   }
 
   /** Her saniye: koşan hamsterin canı düşer; dinlenenlerin uyanma anı kontrol edilir */
   tick(dt: number, running: boolean): void {
-    if (!this.known) return;
+    if (!this.known || this.activeId === null) return;
     const e = this.entry(this.activeId);
     if (running && e.left > 0) {
       if (e.resetAt === null) e.resetAt = Date.now() + RUN_WINDOW_MS;
@@ -116,17 +122,17 @@ export class RunBudget {
 
   /** Hamsterin kalan canı (sn) */
   left(id = this.activeId): number {
-    return this.known ? this.entry(id).left : RUN_LIMIT_SECONDS;
+    return this.known && id !== null ? this.entry(id).left : this.limit;
   }
 
   /** Can 0..1 */
-  fraction(id = this.activeId): number {
-    return this.left(id) / RUN_LIMIT_SECONDS;
+  fraction(id: string | null = this.activeId): number {
+    return this.left(id) / this.limit;
   }
 
   /** Can bitti: hamster dinleniyor */
   isResting(id = this.activeId): boolean {
-    if (!this.known) return false;
+    if (!this.known || id === null) return false;
     const e = this.entry(id);
     return e.left <= 0 && e.resetAt !== null;
   }
@@ -138,7 +144,7 @@ export class RunBudget {
 
   /** Uyanmaya kalan süre (ms); dinlenmiyorsa 0 */
   wakeInMs(id = this.activeId): number {
-    if (!this.isResting(id)) return 0;
+    if (id === null || !this.isResting(id)) return 0;
     return Math.max(0, (this.entry(id).resetAt ?? 0) - Date.now());
   }
 }

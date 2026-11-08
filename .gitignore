@@ -3,3 +3,35 @@ dist
 .DS_Store
 .env
 .env.local
+
+# Yerel test ayarları (Sepolia test kurulumu): asla repoya girmez
+.dev.vars
+.env.*.local
+
+# Wrangler yerel durum
+.wrangler/
+tools/e2e/*-prof-*
+tools/e2e/shots/
+tools/e2e/*.log
+
+# Yalnızca yerel (GitHub'a gönderilmez): notlar, kontrat projesi, test araçları, yerel tasarım / kurulum sayfaları
+CLAUDE.md
+docs/HANDOFF.md
+docs/onchain.md
+docs/launch.md
+docs/gas-architecture.md
+contracts/
+tools/
+supabase/test/
+supabase/launch.sql
+worker/test/
+cover.html
+deploy.html
+gift.html
+nft.html
+promo.html
+src/dev/cover.ts
+src/dev/deploy.ts
+src/dev/deploy.css
+src/dev/nft.ts
+src/dev/promo.ts

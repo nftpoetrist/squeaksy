@@ -16,6 +16,7 @@ export const DAILY_BLOCK_CAP = 20000;
 
 import type { HamsterVariant } from '../character/hamsterBase';
 import type { PixsyKind } from '../character/companion';
+import { ONCHAIN } from '../onchain/config';
 
 export type CardArt = 'hamster' | 'sky' | 'inferno' | 'seraph' | 'pixsy' | 'pixsy-eth' | 'pixsy-btc';
 
@@ -66,6 +67,8 @@ export interface CardDef {
   bonusPerBlock?: number;
   /** Sınırlı arz: dünya genelinde en fazla bu kadar (sunucuda: card_catalog.max_supply) */
   maxSupply?: number;
+  /** Onchain: SqueaksyCards kontratındaki kart türü (sunucuda: card_catalog.chain_type); yoksa başlangıç kartı */
+  chainType?: number;
   stats: CardStat[];
   /** Metinlerde {perBlock} → nadirliğe göre blok başı token */
   abilities: CardAbility[];
@@ -240,6 +243,19 @@ export const CARDS: CardDef[] = [
     flavor: 'It came down from above to run.',
   },
 ];
+
+/**
+ * Onchain mod: fiyat ve arz zincirdeki kontratla aynı (SqueaksyCards.addCard). Tüm set ~1,5 haftada tamamlanır.
+ * Kartlar soulbound: mint edilir, satılmaz.
+ */
+export const ONCHAIN_ECONOMY: Record<string, { chainType: number; price: number; maxSupply: number }> = {
+  'sky-unicorn': { chainType: 1, price: 1500, maxSupply: 5000 },
+  'inferno-king': { chainType: 2, price: 6000, maxSupply: 2500 },
+  'seraph-twin': { chainType: 3, price: 17500, maxSupply: 1250 },
+  'eth-pixsy': { chainType: 4, price: 1000, maxSupply: 5000 },
+  'btc-pixsy': { chainType: 5, price: 3500, maxSupply: 2500 },
+};
+if (ONCHAIN) for (const c of CARDS) Object.assign(c, ONCHAIN_ECONOMY[c.id] ?? {});
 
 export function cardById(id: string): CardDef | undefined {
   return CARDS.find((c) => c.id === id);

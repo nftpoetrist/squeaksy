@@ -1980,3 +1980,167 @@
     display: none;
   }
 }
+
+/* Ekranda olmayan bölümde sonsuz animasyonlar durur (parıltı, sayaç ışıltısı, Mint ışığı): boşuna boyama yok.
+   main.ts görünürlüğü izler (.is-away). */
+.collection.is-away *,
+.collection.is-away *::before,
+.collection.is-away *::after {
+  animation-play-state: paused !important;
+}
+
+/* ================================================================ Performans (GPU)
+ * Kart animasyonları önceden her karede kartın tamamını yeniden boyatıyordu (çerçevede kayan / dönen geçiş,
+ * box-shadow ile nefes alan hale, kayan altın yazı, renk değiştiren folyo): ekran kartı sürekli çalışıp Mac'i ısıtıyordu.
+ * Aynı görünüm, ucuz yoldan:
+ *   - Çerçeve geçişi ayrı bir katmanda yalnızca kayar / döner (transform: yeniden boyama yok)
+ *   - Hale ayrı katmanda yalnızca opaklığı değişir
+ *   - Yazı ve folyo kendi küçük katmanlarında, saniyede ~10 adımda akar (piksel tarzında fark edilmez)
+ *   - Ekranda olmayan kart hiç oynamaz (.is-idle, collection.ts) */
+.card--legendary .card__inner,
+.card--mythic .card__inner {
+  animation: none;
+  box-shadow: var(--shadow);
+}
+
+.card--legendary .card__inner::before,
+.card--mythic .card__inner::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* Legendary: altın geçiş sağdan sola kesintisiz kayar (iki kopya yan yana, bir kopya kadar kayınca başa döner) */
+.card--legendary .card__inner::before {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 500%;
+  background: var(--frame) 0 50% / 50% 250% repeat-x;
+  animation: frame-slide 5s linear infinite;
+}
+
+/* Mythic: opal halka kartın etrafında döner (kartın köşegeninden büyük kare, merkezde) */
+.card--mythic .card__inner::before {
+  left: -50%;
+  top: 50%;
+  width: 200%;
+  aspect-ratio: 1;
+  translate: 0 -50%;
+  background: conic-gradient(#ffffff, #ff8fd2, #a07dff, #4fc8ff, #6ff0b8, #ffcc3a, #ff7ec8, #8f72ff, #5ce6ff, #ffffff);
+  animation: frame-spin 9s linear infinite;
+}
+
+@keyframes frame-slide {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes frame-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+/* Hale: kartın etrafında nefes alır (yalnızca opaklık) */
+.card--legendary::before,
+.card--mythic::before,
+.card--mythic::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 14px;
+  pointer-events: none;
+  opacity: 0;
+  will-change: opacity;
+}
+
+.card--legendary::before {
+  box-shadow: 0 0 38px rgba(255, 200, 80, 0.75), 0 0 80px rgba(255, 110, 200, 0.28);
+  animation: aura-pulse 2.6s ease-in-out infinite;
+}
+
+.card--mythic::before {
+  box-shadow: 0 0 40px rgba(140, 220, 255, 0.75), 0 0 90px rgba(190, 160, 255, 0.4);
+  animation: aura-pulse 4.5s ease-in-out infinite;
+}
+
+.card--mythic::after {
+  box-shadow: 0 0 40px rgba(200, 170, 255, 0.75), 0 0 90px rgba(255, 220, 140, 0.35);
+  animation: aura-pulse 4.5s ease-in-out -2.25s infinite;
+}
+
+.card--legendary > .card__inner,
+.card--mythic > .card__inner {
+  z-index: 1;
+}
+
+@keyframes aura-pulse {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Yazı ve folyo: kendi katmanında, ~10 adım/sn (yeniden boyama yalnızca o küçük alanda) */
+.card--legendary .card__name,
+.card--mythic .card__name,
+.card--legendary .card__foil,
+.card--mythic .card__foil {
+  will-change: transform;
+}
+
+.card--legendary .card__name {
+  animation: gold-sheen 4s steps(40) infinite;
+}
+
+.card--mythic .card__name {
+  animation: mythic-name-flow 4.5s steps(45) infinite;
+}
+
+.card--legendary .card__foil {
+  animation: holo-shift 6s steps(48) infinite alternate;
+}
+
+.card--mythic .card__foil {
+  animation: holo-shift 7s steps(56) infinite alternate;
+}
+
+/* Dönen ışık huzmeleri: kendi katmanında (döndürme yeniden boyatmaz) */
+.card--legendary .card__art-bg::before,
+.card--mythic .card__art-bg::before {
+  will-change: rotate;
+}
+
+/* "Yakında" kartının ışıltısı */
+.card--soon .card__inner::after {
+  will-change: transform;
+  animation-timing-function: steps(36);
+}
+
+/* Ekranda olmayan kart: hiçbir animasyon oynamaz */
+.card.is-idle,
+.card.is-idle *,
+.card.is-idle::before,
+.card.is-idle::after,
+.card.is-idle *::before,
+.card.is-idle *::after {
+  animation-play-state: paused !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card--legendary .card__inner::before,
+  .card--mythic .card__inner::before,
+  .card--legendary::before,
+  .card--mythic::before,
+  .card--mythic::after {
+    animation: none !important;
+  }
+}

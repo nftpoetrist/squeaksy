@@ -107,6 +107,35 @@ const MAPS = {
     '.kggk.kggk.',
     '.kkk...kkk.',
   ],
+  // Cüzdan: içinden kart görünen mavi cüzdan, sağda altın düğmeli kapak
+  wallet: [
+    '...kkkkkkk...',
+    '..kwwwwwwwk..',
+    'kkkkkkkkkkkkk',
+    'kbbbbbbbbbbbk',
+    'kbllllllllkkk',
+    'kbbbbbbbbkGgk',
+    'kbbbbbbbbkgok',
+    'kbbbbbbbbbkkk',
+    'kbbbbbbbbbbbk',
+    '.kkkkkkkkkkk.',
+  ],
+  // QR (WalletConnect): üç köşe karesi + veri noktaları
+  qr: [
+    'kkkkk.k.kkkkk',
+    'kwwwk..kkwwwk',
+    'kwkwk.k.kwkwk',
+    'kwwwk.kkkwwwk',
+    'kkkkk.k.kkkkk',
+    '......k......',
+    'kk.kkk.kk.k.k',
+    '.k..k.k..kk..',
+    'kkkkk.kk.k.kk',
+    'kwwwk..kkk.k.',
+    'kwkwk.k..kkk.',
+    'kwwwk.kk.k..k',
+    'kkkkk..k.kk.k',
+  ],
   card: [
     'kkkkkkkk',
     'kbbbbbbk',
@@ -159,8 +188,8 @@ function paint(map: readonly string[], pal: Record<string, string>, scale: numbe
   return c;
 }
 
-export function pixelIcon(name: PixelIconName, scale = 2, cls = 'px-icon'): HTMLCanvasElement {
-  return paint(MAPS[name], PAL, scale, cls);
+export function pixelIcon(name: PixelIconName, scale = 2, cls = 'px-icon', pal?: Record<string, string>): HTMLCanvasElement {
+  return paint(MAPS[name], pal ? { ...PAL, ...pal } : PAL, scale, cls);
 }
 
 export function medalIcon(place: 1 | 2 | 3, scale = 3, cls = 'px-medal'): HTMLCanvasElement {

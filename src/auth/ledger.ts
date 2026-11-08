@@ -1,5 +1,6 @@
 import { FINALE_BONUS, tokensPerBlock } from '../collection/cards';
 import type { AuthBackend, Player, RunBudgetState } from './types';
+import { ONCHAIN } from '../onchain/config';
 
 const FLUSH_DELAY = 3000;
 const RETRY = [4000, 10000, 30000, 60000];
@@ -37,6 +38,9 @@ export class TokenLedger {
   /** Hamster canları geldi (girişte hepsi; her claim yanıtında koşan hamsterinki); main.ts RunBudget'a bağlar */
   onRunBudgets: ((all: Record<string, RunBudgetState> | null) => void) | null = null;
   onRunBudget: ((hamster: string, s: RunBudgetState) => void) | null = null;
+  /** Pixsy canları: girişte hepsi (null = bilinmiyor), her talepte sırttakinin durumu (rested: bu talepte bitti) */
+  onItemBudgets: ((all: Record<string, RunBudgetState> | null) => void) | null = null;
+  onItemBudget: ((item: string, s: RunBudgetState, rested: boolean) => void) | null = null;
   /** Hamster dinleniyor (koşu süresi doldu): blok yazılmaz */
   resting: () => boolean = () => false;
 
@@ -97,7 +101,8 @@ export class TokenLedger {
   }
 
   private get key(): string | null {
-    return this.player ? `squeaksy.pending.${this.player.id}` : null;
+    // Onchain oyun yeni bir sayfa: eski oyundan tarayıcıda kalmış bekleyen bloklar yeni oyuna yazılmaz
+    return this.player ? `squeaksy.pending.${ONCHAIN ? 'v2.' : ''}${this.player.id}` : null;
   }
 
   async setPlayer(p: Player | null): Promise<void> {
@@ -110,19 +115,22 @@ export class TokenLedger {
     this.failures = 0;
     this.applyDailyLeft(null);
     this.onRunBudgets?.(null);
+    this.onItemBudgets?.(null);
     this.changed();
     if (!p) return;
     this.restore();
     try {
-      const [bal, left, run] = await Promise.all([
+      const [bal, left, run, items] = await Promise.all([
         this.backend.fetchBalance(),
         this.backend.fetchDailyLeft?.().catch(() => null) ?? null,
         this.backend.fetchRunBudgets?.().catch(() => null) ?? null,
+        this.backend.fetchItemBudgets?.().catch(() => null) ?? null,
       ]);
       this.balance = bal;
       if (this.player === p) {
         this.applyDailyLeft(left);
         this.onRunBudgets?.(run);
+        this.onItemBudgets?.(items);
       }
     } catch (err) {
       console.warn('[Squeaksy] bakiye yüklenemedi', err);
@@ -211,6 +219,7 @@ export class TokenLedger {
       this.persist();
       this.applyDailyLeft(res.dailyLeft);
       if (res.runLeft !== undefined) this.onRunBudget?.(hamster, { left: res.runLeft, resetAt: res.runResetAt ?? null });
+      if (res.itemId && res.itemLeft !== undefined) this.onItemBudget?.(res.itemId, { left: res.itemLeft, resetAt: res.itemResetAt ?? null }, res.itemRested === true);
       this.changed();
     } catch (err) {
       console.warn('[Squeaksy] tokenlar gönderilemedi, tekrar denenecek', err);

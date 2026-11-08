@@ -1,3 +1,4 @@
+import { shortAddress } from '../wallet/chain';
 import type { AuthBackend, LeaderKind, LeaderPage, LeaderRow } from '../auth/types';
 import { DEFAULT_POSE, drawHamsterPose, type HamsterVariant } from '../character/hamsterBase';
 import type { PixsyKind } from '../character/companion';
@@ -120,6 +121,11 @@ function variantOf(id: string): HamsterVariant {
   return cardById(id)?.variant ?? 'starter';
 }
 
+/** X adı @handle; X adı olmayan oyuncu (test girişi) cüzdan adresiyle, kısaltılmış */
+function shownName(handle: string): string {
+  return /^0x[0-9a-fA-F]{40}$/.test(handle) ? shortAddress(handle) : `@${handle}`;
+}
+
 /** Avatar: X fotoğrafı varsa o, yoksa oyuncunun koşan hamsteri (piksel) */
 function avatar(row: LeaderRow, size: number): HTMLElement {
   const wrap = el('span', 'lb__avatar');
@@ -150,7 +156,7 @@ function rankCell(rank: number): HTMLElement {
     cell.classList.add('lb__rank--medal');
   } else {
     // 0 = sıra henüz bilinmiyor (tam sıralama açılmadan önce)
-    cell.append(el('b', 'lb__rank-num', rank > 0 ? fmt.format(rank) : '—'));
+    cell.append(el('b', 'lb__rank-num', rank > 0 ? fmt.format(rank) : '-'));
   }
   return cell;
 }
@@ -169,7 +175,7 @@ function rowEl(row: LeaderRow, isMe: boolean): HTMLElement {
   const li = el('li', `lb__row${top ? ` lb__row--top lb__row--${row.rank}` : ''}${isMe ? ' is-me' : ''}`);
   const player = el('div', 'lb__player');
   const names = el('div', 'lb__names');
-  names.append(el('b', 'lb__handle', `@${row.handle}`), el('span', 'lb__tagline', `Runs with ${cardById(row.hamster)?.name ?? 'Squeaksy'}`));
+  names.append(el('b', 'lb__handle', shownName(row.handle)), el('span', 'lb__tagline', `Runs with ${cardById(row.hamster)?.name ?? 'Squeaksy'}`));
   player.append(avatar(row, top ? 56 : 40), names);
   const stars = el('div', 'lb__cell lb__stars');
   stars.append(pixelIcon('star', 2), el('b', '', fmt.format(row.stars)));
@@ -283,13 +289,13 @@ export function mountLeaderboard(section: HTMLElement, backend: AuthBackend, sig
       c.style.width = `${art.width * 2}px`;
       c.style.height = `${art.height * 2}px`;
       who.append(av, c);
-      mine.append(who, el('span', 'lb__mine-handle', `@${me.handle}`));
+      mine.append(who, el('span', 'lb__mine-handle', shownName(me.handle)));
     } else {
       mine.append(c);
-      if (me) mine.append(el('span', 'lb__mine-handle', `@${me.handle}`));
+      if (me) mine.append(el('span', 'lb__mine-handle', shownName(me.handle)));
     }
     if (me) {
-      mine.append(el('b', 'lb__mine-rank', me.rank > 0 ? `#${fmt.format(me.rank)}` : '#—'));
+      mine.append(el('b', 'lb__mine-rank', me.rank > 0 ? `#${fmt.format(me.rank)}` : '#-'));
       const st = el('div', 'lb__mine-stars');
       st.append(pixelIcon('star', 2), el('span', '', `${fmt.format(me.stars)} Stars`));
       mine.append(st);

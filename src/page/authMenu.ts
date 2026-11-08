@@ -1,5 +1,8 @@
 import type { TokenLedger } from '../auth/ledger';
 import type { AuthBackend, Player } from '../auth/types';
+import type { WalletManager } from '../wallet/wallet';
+import { appendWalletMenu, walletLine } from './walletButton';
+import { drawStar } from './tokenHud';
 
 /** 7×7 piksel "X" işareti */
 function drawXMark(canvas: HTMLCanvasElement): void {
@@ -15,25 +18,52 @@ function drawXMark(canvas: HTMLCanvasElement): void {
 }
 
 /**
- * Navbar'ın sağ üstü: çıkışta "Sign in with X" butonu, girişte piksel profil
- * fotoğrafı + @kullanıcı adı + token bakiyesi; tıklayınca küçük menü (Sign out).
+ * Navbar'ın sağ üstü: çıkışta "Sign in with X" butonu, girişte X profil fotoğrafı + @kullanıcı adı + yıldızlar;
+ * cüzdan bağlıysa profil ile birleşir: ikinci satırda yıldızlar yerine küçük yazıyla kısa cüzdan adresi (ağ noktasıyla),
+ * menüde cüzdan bölümü (walletButton.appendWalletMenu) + Sign out.
  */
-export function mountAuthMenu(slot: HTMLElement, backend: AuthBackend, ledger: TokenLedger, getShownBalance: () => number): {
+export function mountAuthMenu(
+  slot: HTMLElement,
+  backend: AuthBackend,
+  ledger: TokenLedger,
+  getShownBalance: () => number,
+  wallet?: WalletManager,
+): {
   render: (p: Player | null) => void;
   refreshBalance: () => void;
+  /** Onchain: profilde cüzdandaki STARS gösterilir (null = henüz bilinmiyor) */
+  setWalletStars: (n: number | null) => void;
 } {
   slot.classList.add('nav__auth');
+  // Kendi kutusu: aynı navbar yuvasında solunda cüzdan butonu durur (walletButton.ts)
+  const box = document.createElement('div');
+  box.className = 'nav__profile';
+  slot.append(box);
   const fmt = new Intl.NumberFormat('en-US');
   let balanceEl: HTMLElement | null = null;
   let closeMenu: (() => void) | null = null;
+  let current: Player | null = null;
+  /** Bir sonraki çizimde menü açık kalsın (cüzdan menüsü içinden yeniden çizim) */
+  let keepOpen = false;
 
+  /** Onchain modda cüzdandaki STARS (undefined: eski mod, oyundaki bakiye gösterilir) */
+  let walletStars: number | null | undefined;
   const refreshBalance = () => {
-    if (balanceEl) balanceEl.textContent = ledger.loaded ? fmt.format(getShownBalance()) : '…';
+    if (!balanceEl) return;
+    if (walletStars !== undefined) {
+      balanceEl.textContent = walletStars === null ? '0' : fmt.format(walletStars);
+      balanceEl.parentElement!.title = 'STARS in your wallet';
+    } else balanceEl.textContent = ledger.loaded ? fmt.format(getShownBalance()) : '…';
+  };
+  const setWalletStars = (n: number | null) => {
+    walletStars = n;
+    refreshBalance();
   };
 
   const render = (p: Player | null) => {
+    current = p;
     closeMenu?.();
-    slot.replaceChildren();
+    box.replaceChildren();
     balanceEl = null;
     if (!p) {
       const btn = document.createElement('button');
@@ -45,7 +75,8 @@ export function mountAuthMenu(slot: HTMLElement, backend: AuthBackend, ledger: T
       drawXMark(mark);
       const label = document.createElement('span');
       // Dar ekranda sadece "Sign in" (X işareti zaten yanında)
-      label.append('Sign in', Object.assign(document.createElement('span'), { className: 'x-signin__long', textContent: ' with X' }));
+      if (backend.signInLabel) label.textContent = backend.signInLabel;
+      else label.append('Sign in', Object.assign(document.createElement('span'), { className: 'x-signin__long', textContent: ' with X' }));
       btn.append(mark, label);
       btn.title = backend.configured ? 'Sign in with your X account to earn stars' : 'X login is not configured yet';
       btn.addEventListener('click', async () => {
@@ -65,7 +96,7 @@ export function mountAuthMenu(slot: HTMLElement, backend: AuthBackend, ledger: T
       label.append('Sign in', Object.assign(document.createElement('span'), { className: 'x-signin__long', textContent: ' with X' }));
         }
       });
-      slot.append(btn);
+      box.append(btn);
       return;
     }
 
@@ -104,15 +135,26 @@ export function mountAuthMenu(slot: HTMLElement, backend: AuthBackend, ledger: T
     const handle = document.createElement('span');
     handle.className = 'profile__handle';
     handle.textContent = `@${p.handle}`;
-    const bal = document.createElement('span');
-    bal.className = 'profile__balance';
-    const coin = document.createElement('i');
-    coin.className = 'profile__coin';
-    coin.setAttribute('aria-hidden', 'true');
+    // Cüzdan bağlıysa: ikinci satırda kısa cüzdan adresi
+    const wline = wallet ? walletLine(wallet) : null;
+    if (wline) {
+      btn.classList.add('is-wallet');
+      if (!wallet!.onSepolia) btn.classList.add('is-wrong');
+      btn.setAttribute('aria-label', `@${p.handle}, wallet ${wallet!.state.address}${wallet!.onSepolia ? '' : ', wrong network'}`);
+      info.append(handle, wline);
+    } else {
+      info.append(handle);
+    }
+    // Sağda yıldız rozeti: oyun panelindeki sayacın piksel yıldızı + sayı (onchain: cüzdandaki STARS)
+    const stars = document.createElement('span');
+    stars.className = 'profile__stars';
+    const star = document.createElement('canvas');
+    star.className = 'profile__star';
+    star.setAttribute('aria-hidden', 'true');
+    drawStar(star);
     balanceEl = document.createElement('b');
-    bal.append(coin, balanceEl, document.createTextNode(' stars'));
-    info.append(handle, bal);
-    btn.append(avatar, info);
+    stars.append(star, balanceEl);
+    btn.append(avatar, info, stars);
 
     const menu = document.createElement('div');
     menu.className = 'profile__menu';
@@ -129,9 +171,15 @@ export function mountAuthMenu(slot: HTMLElement, backend: AuthBackend, ledger: T
       await ledger.flush();
       await backend.signOut();
     });
-    menu.append(name, out);
+    menu.append(name);
+    if (wallet)
+      appendWalletMenu(menu, wallet, (open) => {
+        keepOpen = open;
+        render(current);
+      });
+    menu.append(out);
     wrap.append(btn, menu);
-    slot.append(wrap);
+    box.append(wrap);
 
     const onDoc = (e: MouseEvent) => {
       if (!wrap.contains(e.target as Node)) close();
@@ -146,20 +194,36 @@ export function mountAuthMenu(slot: HTMLElement, backend: AuthBackend, ledger: T
       document.removeEventListener('keydown', onKey);
       closeMenu = null;
     };
-    btn.addEventListener('click', () => {
-      if (!menu.hidden) {
-        close();
-        return;
-      }
+    const open = () => {
       menu.hidden = false;
       btn.setAttribute('aria-expanded', 'true');
       closeMenu = close;
       window.setTimeout(() => document.addEventListener('click', onDoc));
       document.addEventListener('keydown', onKey);
+    };
+    btn.addEventListener('click', () => {
+      if (!menu.hidden) {
+        close();
+        return;
+      }
+      open();
+      // Menü açılırken cüzdanın gerçek ağını tekrar sor (değiştiyse menü kendini günceller, açık kalır)
+      void wallet?.resync();
     });
+    if (keepOpen) {
+      keepOpen = false;
+      open();
+    }
 
     refreshBalance();
   };
 
-  return { render, refreshBalance };
+  // Cüzdan bağlanınca / değişince profil yeniden çizilir (menü açıksa açık kalır)
+  wallet?.onChange(() => {
+    if (!current) return;
+    keepOpen = closeMenu !== null;
+    render(current);
+  });
+
+  return { render, refreshBalance, setWalletStars };
 }

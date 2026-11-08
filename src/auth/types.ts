@@ -23,6 +23,14 @@ export interface ClaimResult {
   runLeft?: number;
   /** Koşu penceresinin bittiği an (ISO); pencere başlamadıysa null */
   runResetAt?: string | null;
+  /** Sırttaki Pixsy (sunucunun saydığı; null = sırt boş). Eski şemada undefined. */
+  itemId?: string | null;
+  /** Pixsy'nin 24 saatlik penceresinde kalan saniye */
+  itemLeft?: number;
+  /** Pixsy penceresinin bittiği an (ISO) */
+  itemResetAt?: string | null;
+  /** Pixsy'nin canı bu talepte bitti: sunucu onu sırttan indirdi (istemci minderine uçurur) */
+  itemRested?: boolean;
 }
 
 /** Hamsterin koşu hakkı: 24 saatte en fazla 2 saat */
@@ -42,6 +50,8 @@ export interface AuthBackend {
   onChange(fn: (p: Player | null) => void): void;
   signIn(): Promise<void>;
   signOut(): Promise<void>;
+  /** Giriş butonunun yazısı (test kurulumunda "Test sign in"); yoksa "Sign in with X" */
+  readonly signInLabel?: string;
   /** Sunucudaki bakiye */
   fetchBalance(): Promise<number>;
   /** Bugün (UTC) kalan blok hakkı (bilinmiyorsa null) */
@@ -49,6 +59,8 @@ export interface AuthBackend {
   claim(blocks: number, bonus: number): Promise<ClaimResult>;
   /** Hamster canları (hamster kartı → durum; kaydı olmayan hamster tam canlı). Eski şemada null */
   fetchRunBudgets?(): Promise<Record<string, RunBudgetState> | null>;
+  /** Pixsy canları (sırt eşyaları; null = bu şemada yok, sınır uygulanmaz) */
+  fetchItemBudgets?(): Promise<Record<string, RunBudgetState> | null>;
   /** Satın alınmış kartlar (başlangıç kartları hariç) */
   fetchOwned(): Promise<string[]>;
   /** Kart satın alır; yeni bakiyeyi döner */

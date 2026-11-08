@@ -1,9 +1,12 @@
 import type { PixelStormBackground } from '../background/Background';
+import { ONCHAIN } from '../onchain/config';
 import type { HamsterState } from '../background/layers/hamster';
 import { clock, type RunBudget } from '../auth/runBudget';
+import { itemSprite } from '../background/layers/hut';
+import type { PixsyKind } from '../character/companion';
 
 const HINTS: Record<HamsterState, string> = {
-  sleep: 'Zzz… wake the hamster up!',
+  sleep: '',
   wake: 'Huh?!',
   walkIn: 'Heading to the wheel…',
   jumpIn: 'Hop!',
@@ -20,6 +23,8 @@ const LIFE_CELLS = 10;
 export interface RunButtonUi {
   /** Hamster canı: RUN altında can çubuğu, can bitince uyanma sayacı */
   setBudget(b: RunBudget): void;
+  /** Pixsy canı: sırtta bir Pixsy varken can çubuğunun altında kendi çubuğu */
+  setItemBudget(b: RunBudget, current: () => { id: string; kind: PixsyKind; name: string } | null): void;
 }
 
 /**
@@ -49,10 +54,50 @@ export function mountRunButton(stage: HTMLElement, bg: PixelStormBackground): Ru
   lifeText.className = 'run-life__time';
   life.append(heart, cells, lifeText);
 
+  // Pixsy can çubuğu: sırttaki Pixsy'nin küçük görseli + 10 hücre + kalan süre
+  const pix = document.createElement('div');
+  pix.className = 'run-life run-life--pixsy';
+  pix.hidden = true;
+  const pixIcon = document.createElement('canvas');
+  pixIcon.className = 'run-life__pixsy';
+  pixIcon.setAttribute('aria-hidden', 'true');
+  const pixCells = document.createElement('span');
+  pixCells.className = 'run-life__bar';
+  pixCells.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < LIFE_CELLS; i++) pixCells.append(document.createElement('i'));
+  const pixText = document.createElement('span');
+  pixText.className = 'run-life__time';
+  pix.append(pixIcon, pixCells, pixText);
+  let itemBudget: RunBudget | null = null;
+  let currentItem: () => { id: string; kind: PixsyKind; name: string } | null = () => null;
+  let drawnKind: PixsyKind | null = null;
+  const syncItem = () => {
+    const it = currentItem();
+    const show = !!itemBudget?.active && !!it && !!budget?.active;
+    pix.hidden = !show;
+    if (!show || !itemBudget || !it) return;
+    if (drawnKind !== it.kind) {
+      const src = itemSprite(it.kind);
+      pixIcon.width = src.width;
+      pixIcon.height = src.height;
+      const ctx = pixIcon.getContext('2d')!;
+      ctx.clearRect(0, 0, src.width, src.height);
+      ctx.drawImage(src, 0, 0);
+      drawnKind = it.kind;
+    }
+    const left = itemBudget.left(it.id);
+    const on = Math.ceil((left / itemBudget.limit) * LIFE_CELLS);
+    [...pixCells.children].forEach((c, i) => c.classList.toggle('is-on', i < on));
+    pix.classList.toggle('is-low', left <= 3 * 60);
+    pixText.textContent = `${clock(left)} left`;
+    pix.setAttribute('aria-label', `${it.name} energy: ${clock(left)} left today`);
+    pix.title = `${it.name} rides for ${clock(left)} more today, then flies back to its cushion`;
+  };
+
   const hint = document.createElement('p');
   hint.className = 'run-hint';
   hint.setAttribute('aria-live', 'polite');
-  wrap.append(btn, life, hint);
+  wrap.append(btn, life, pix, hint);
   stage.appendChild(wrap);
 
   // Uyanma sayacı: uyuyan hamsterin başının üstünde
@@ -103,7 +148,7 @@ export function mountRunButton(stage: HTMLElement, bg: PixelStormBackground): Ru
       const was = rest.hidden;
       rest.hidden = bg.hamsterState !== 'sleep' && bg.hamsterState !== 'settle';
       if (was && !rest.hidden) requestAnimationFrame(placeRest);
-      hint.textContent = 'Resting after 2 hours of running';
+      hint.textContent = ONCHAIN ? 'Resting after 15 minutes of running' : 'Resting after 2 hours of running';
     } else {
       rest.hidden = true;
       hint.textContent = HINTS[bg.hamsterState];
@@ -154,9 +199,16 @@ export function mountRunButton(stage: HTMLElement, bg: PixelStormBackground): Ru
       budget = b;
       b.onChange(() => {
         sync();
+        syncItem();
         placeRest();
       });
       sync();
+    },
+    setItemBudget(b, current) {
+      itemBudget = b;
+      currentItem = current;
+      b.onChange(syncItem);
+      syncItem();
     },
   };
 }

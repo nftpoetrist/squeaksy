@@ -10,10 +10,15 @@ import { pixelIcon, type PixelIconName } from './page/pixelIcons';
 import { mountAbout } from './page/about';
 import { mountRunButton } from './page/runButton';
 import { bindUiClicks } from './audio/uiClicks';
-import { RunBudget } from './auth/runBudget';
+import { ITEM_LIMIT_SECONDS, RunBudget } from './auth/runBudget';
 import { mountTokenHud } from './page/tokenHud';
 import { mountSoundToggle } from './page/soundToggle';
 import { mountAuthMenu } from './page/authMenu';
+import { mountWalletButton, openWalletModal } from './page/walletButton';
+import { WalletManager } from './wallet/wallet';
+import { ONCHAIN } from './onchain/config';
+import { mountClaimButton } from './page/claimButton';
+import type { SupabaseBackend } from './auth/supabaseBackend';
 import { mountCollection } from './collection/collection';
 import { mountHamsterShop } from './collection/hamsterShop';
 import { TokenLedger } from './auth/ledger';
@@ -131,7 +136,33 @@ void (async () => {
   const hudEl = world.querySelector<HTMLElement>('.token-hud');
   if (hudEl) mountSoundToggle(world, hudEl, audio);
   const slot = document.querySelector<HTMLElement>('[data-auth]');
-  const menu = slot ? mountAuthMenu(slot, backend, ledger, () => Math.floor(ledger.total - background.coinsInFlight + 1e-6)) : null;
+  // Cüzdan (Sepolia): bağlı değilken X profilinin solunda "Connect wallet" butonu (yalnızca X ile girişliyken);
+  // bağlanınca X profiliyle birleşir (fotoğraf + @kullanıcı adı, altında kısa adres).
+  // Test: ?dev&mockWallet=1|2|6 (sahte cüzdan) &mockChain (yanlış ağ) &mockStuck (geçmeyen cüzdan) &mockReject &autoWallet &openWallet &walletMenu &wcUri=…
+  if (DEV && params.has('mockWallet')) {
+    const { installMockWallets } = await import('./wallet/mockWallet');
+    installMockWallets(Number(params.get('mockWallet')) || 1, params.has('mockChain') ? 8453 : 11155111, params.has('mockReject'), params.has('mockStuck'));
+  }
+  const wallet = new WalletManager((import.meta.env.VITE_WALLETCONNECT_PROJECT_ID as string | undefined) ?? '');
+  const menu = slot ? mountAuthMenu(slot, backend, ledger, () => Math.floor(ledger.total - background.coinsInFlight + 1e-6), wallet) : null;
+  const walletSlot = document.createElement('div');
+  slot?.prepend(walletSlot);
+  const walletUi = slot ? mountWalletButton(walletSlot, wallet) : null;
+  void wallet.restore();
+
+  // Onchain (şimdilik yalnızca test kurulumu): sayaç claim edilmemiş yıldızları gösterir, altında Claim butonu
+  const claimUi =
+    ONCHAIN && 'accessToken' in backend
+      ? mountClaimButton(world, { backend: backend as unknown as SupabaseBackend, wallet, ledger, openWallet: () => void openWalletModal(wallet) })
+      : null;
+  // Onchain: Market'te kartlar cüzdandaki STARS ile mint edilir
+  if (ONCHAIN && 'accessToken' in backend)
+    inventory.enableMint({ backend: backend as unknown as SupabaseBackend, wallet, openWallet: () => void openWalletModal(wallet) });
+  // Onchain: profildeki yıldız rozeti cüzdandaki STARS'ı gösterir
+  if (ONCHAIN && menu) {
+    menu.setWalletStars(inventory.walletStars);
+    inventory.onChange(() => menu.setWalletStars(inventory.walletStars));
+  }
   ledger.onChange(() => menu?.refreshBalance());
   background.events.on('token:collect', () => menu?.refreshBalance());
 
@@ -178,6 +209,13 @@ void (async () => {
   const shop = hamsters ? mountHamsterShop(hamsters, inventory, ledger, signIn, { onSwitch: (id) => hutUi?.open(id) }) : null;
   hutUi = mountHutMenu(world, background, inventory, ledger, signIn, { onBuy: (id) => shop?.focus(id) });
   syncHamsters();
+  // Ekranda olmayan kart bölümlerinde CSS animasyonları durur (Mac'i boşuna yormasın)
+  if ('IntersectionObserver' in window) {
+    const away = new IntersectionObserver((es) => {
+      for (const e of es) e.target.classList.toggle('is-away', !e.isIntersecting);
+    }, { rootMargin: '200px 0px' });
+    document.querySelectorAll('.collection, #market').forEach((sec) => away.observe(sec));
+  }
 
   // Hamster canı: her hamster 24 saatte en fazla 2 saat koşar (sunucu claim_tokens'ta uygular).
   // Can biterse hamster yatağına döner ve pencere bitene kadar uyur; başka bir hamster kendi canıyla koşabilir.
@@ -189,13 +227,40 @@ void (async () => {
   inventory.onChange(() => budget.setActive(inventory.active));
   runUi.setBudget(budget);
   hutUi?.setBudget(budget);
+
+  // Pixsy canı: her Pixsy 24 saatte 15 dakika, yalnızca koşan hamsterin sırtındayken saniye saniye azalır
+  // (sunucu claim_tokens'ta uygular). Biterse hamster koşmaya devam eder, Pixsy kendi uçma efektiyle minderine uçar.
+  const itemBudget = new RunBudget(ITEM_LIMIT_SECONDS);
+  itemBudget.setActive(inventory.equippedIn('back'));
+  inventory.onChange(() => itemBudget.setActive(inventory.equippedIn('back')));
+  inventory.itemResting = (id) => itemBudget.isResting(id);
+  ledger.onItemBudgets = (all) => itemBudget.syncAll(all);
+  ledger.onItemBudget = (id, s, rested) => {
+    itemBudget.sync(id, rested ? { left: 0, resetAt: s.resetAt } : s);
+    // Sunucu indirdi (bu talepte bitti ya da önceden bitmişti): ekranda da uçsun
+    if ((rested || s.left <= 0) && inventory.equippedIn('back') === id) void inventory.restItem(id);
+  };
+  itemBudget.onChange(() => {
+    const worn = inventory.equippedIn('back');
+    if (worn && itemBudget.isResting(worn)) void inventory.restItem(worn);
+  });
+  runUi.setItemBudget(itemBudget, () => {
+    const id = inventory.equippedIn('back');
+    const c = id ? cardById(id) : undefined;
+    return c?.buddy ? { id: c.id, kind: c.buddy, name: c.name } : null;
+  });
+  hutUi?.setItemBudget(itemBudget);
+
   let lastTick = performance.now();
   window.setInterval(() => {
     const now = performance.now();
     const dt = Math.min(5, (now - lastTick) / 1000);
     lastTick = now;
     const running = ledger.signedIn && background.hamsterRunning && background.hamsterState === 'run' && !document.hidden;
+    // Dinlenen hamster blok kazanmaz: Pixsy de azalmaz
+    const earning = running && !budget.resting;
     budget.tick(dt, running);
+    itemBudget.tick(dt, earning && inventory.equippedIn('back') !== null);
   }, 1000);
 
   // Yıldız kazanımı: giriş yapılmış, günlük tavan dolmamış ve hamsterin canı varsa
@@ -214,6 +279,8 @@ void (async () => {
   const apply = (p: Player | null) => {
     background.setEarning(p !== null);
     menu?.render(p);
+    walletUi?.setSignedIn(p !== null);
+    claimUi?.refresh();
     void ledger.setPlayer(p);
     void inventory.setPlayer(p);
     hud.refresh();
@@ -225,6 +292,17 @@ void (async () => {
   // Test (sahte oturum): ?dev&mockUser=a&mockBalance=3000&buy=sky-unicorn&equip=sky-unicorn&openHut=inferno-king
   if (DEV) {
     await new Promise((r) => setTimeout(r, 50));
+    // Cüzdan testleri (sahte cüzdanla)
+    if (params.has('autoWallet')) {
+      const { detectedWallets } = await import('./wallet/eip6963');
+      const w = detectedWallets()[0];
+      if (w) await wallet.connectInjected(w).catch((err) => console.warn('[dev] cüzdan', err));
+    }
+    if (params.has('openWallet') || params.has('wcUri')) {
+      const uri = params.get('wcUri');
+      await openWalletModal(wallet, uri ? { demoUri: uri === '1' ? 'wc:5f2b7e1c9a8d4f3e2b1a0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f@2?relay-protocol=irn&symKey=8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b' : uri } : {});
+    }
+    if (params.has('walletMenu')) document.querySelector<HTMLButtonElement>('.profile__btn')?.click();
     const buy = params.get('buy');
     const equip = params.get('equip');
     try {

@@ -162,7 +162,12 @@ export class PixelStormBackground {
       if (this.root.clientWidth === this.builtW && this.root.clientHeight === this.builtH) return;
       // Gizliyken pencere boyutu değiştiyse panel görünür olur olmaz (beklemeden) yeniden kurulur
       if (wasHidden) this.rebuild();
-      else this.resizeTimer = window.setTimeout(() => this.rebuild(), 120);
+      else {
+        // Yeniden kurulana kadar mevcut görüntü yeni kutuya anında esnetilir: panel genişlerken (ör. MetaMask'ın
+        // Chrome yan paneli kapanırken) sağda boş / kara şerit kalmaz
+        this.stretchToBox();
+        this.resizeTimer = window.setTimeout(() => this.rebuild(), 120);
+      }
     };
     window.addEventListener('resize', onResize);
     this.cleanups.push(() => window.removeEventListener('resize', onResize));
@@ -633,6 +638,19 @@ export class PixelStormBackground {
     return s;
   }
 
+  /** Kurulu sahneyi (yeniden kurmadan) kutunun yeni boyutuna esnetir: yalnızca CSS, çok ucuz */
+  private stretchToBox(): void {
+    if (this.builtW <= 0 || this.builtH <= 0) return;
+    const sx = this.root.clientWidth / this.builtW;
+    const sy = this.root.clientHeight / this.builtH;
+    if (!(sx > 0 && sy > 0)) return;
+    const s = this.scale;
+    this.canvas.style.width = `${this.canvas.width * s * sx}px`;
+    this.canvas.style.height = `${this.canvas.height * s * sy}px`;
+    this.canvas.style.left = `${-MARGIN * s * sx}px`;
+    this.canvas.style.top = `${-MARGIN * s * sy}px`;
+  }
+
   /** Sahnenin en son kurulduğu kutu boyutu (CSS px) */
   private builtW = -1;
   private builtH = -1;
@@ -766,6 +784,9 @@ export class PixelStormBackground {
     this.step(0, 16);
   }
 
+  /** Düzenli yıldırım sayacı (gerçek saniye): her ambientEverySeconds'ta rastgele bir buluta */
+  private ambientT = 0;
+
   private step(realDt: number, elapsedMs: number): void {
     const scene = this.scene;
     if (!scene) return;
@@ -790,6 +811,16 @@ export class PixelStormBackground {
 
     this.safe('update', () => {
       this.lightning.update(dt, f, this.cfg.lightning, this.weather.nearRate, this.weather.farRate, this.reduced);
+      // Hava ne olursa olsun düzenli yıldırım: rastgele bir blok bulutu, şimşek + gök gürültüsü sesiyle.
+      // Final şarjında (zaten şimşekler sıklaşıyor) atlanır. Sekme gizliyken döngü durduğu için sayaç da durur.
+      const every = this.cfg.lightning.ambientEverySeconds;
+      if (every > 0 && this.cfg.lightning.enabled) {
+        this.ambientT += realDt;
+        if (this.ambientT >= every) {
+          this.ambientT = 0;
+          if (this.chainPhase !== 'charge') this.strikeBlock({ kind: 'near', coins: 0 });
+        }
+      }
       f.flash = this.lightning.flash;
       // Hamster çarkı döndürür: çarkın hedef hızı hamsterin koşu gücünden gelir
       this.hamster.update(dt, this.wheel.speed);

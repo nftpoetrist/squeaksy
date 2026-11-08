@@ -1,6 +1,7 @@
 import type { TokenLedger } from '../auth/ledger';
 import type { PixelStormBackground } from '../background/Background';
 import { DAILY_BLOCK_CAP } from '../collection/cards';
+import { ONCHAIN, TEST_SIGN_IN } from '../onchain/config';
 
 /** 11×11 piksel yıldız ikonu (oyunun para birimi): 1 koyu kenar, 2 gövde, 3 parlak, 4 gölge */
 const STAR = [
@@ -18,7 +19,7 @@ const STAR = [
 ];
 const COLORS: Record<string, string> = { '1': '#5a3210', '2': '#ffc93c', '3': '#fff6c8', '4': '#d8961e' };
 
-function drawStar(canvas: HTMLCanvasElement): void {
+export function drawStar(canvas: HTMLCanvasElement): void {
   canvas.width = STAR.length;
   canvas.height = STAR.length;
   const ctx = canvas.getContext('2d');
@@ -68,12 +69,18 @@ export function mountTokenHud(
     const signedIn = ledger.signedIn;
     el.classList.toggle('is-guest', !signedIn);
     el.disabled = signedIn;
-    el.title = signedIn ? `Stars: ${ledger.perBlock} per completed block, +10 when every cloud is full` : 'Sign in with X to earn stars';
+    el.title = signedIn
+      ? ONCHAIN
+        ? `Unclaimed stars: ${ledger.perBlock} per completed block, +10 when every cloud is full. Claim them to your wallet.`
+        : `Stars: ${ledger.perBlock} per completed block, +10 when every cloud is full`
+      : TEST_SIGN_IN
+        ? 'Sign in to earn stars'
+        : 'Sign in with X to earn stars';
     const s = bg.chainStatus;
     el.classList.toggle('is-surge', s.phase === 'charge');
     if (!signedIn) {
       count.textContent = '';
-      sub.textContent = 'Sign in with X to earn';
+      sub.textContent = TEST_SIGN_IN ? 'Sign in to earn' : 'Sign in with X to earn';
       return;
     }
     count.textContent = ledger.loaded ? fmt.format(Math.max(0, Math.floor(ledger.total - bg.coinsInFlight + 1e-6))) : '…';
@@ -108,6 +115,7 @@ export function mountTokenHud(
   ledger.onChange(refresh);
   window.addEventListener('resize', place);
   window.addEventListener('squeaksy:page', () => requestAnimationFrame(place));
+  window.addEventListener('squeaksy:hud', () => requestAnimationFrame(place));
   // Sayaç genişleyince/daralınca (giriş, büyüyen sayı, font yüklenmesi) ikon yer değiştirir: hedef de güncellenir
   if ('ResizeObserver' in window) {
     const ro = new ResizeObserver(() => place());

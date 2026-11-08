@@ -14,6 +14,8 @@ export interface CollectionSource {
   /** Koşan hamsteri değiştir (verilmezse hamster butonları gösterilmez) */
   equip?(id: string): Promise<void>;
   readonly busy?: boolean;
+  /** Pixsy canı bitti mi (dinleniyor: takılamaz) */
+  itemResting?(id: string): boolean;
 }
 
 /** Yatay şerit + iki yanda piksel ok butonları (fareyle kaydırmak için) */
@@ -78,6 +80,18 @@ function pips(value: number): HTMLElement {
 }
 
 /** Tek kart. `locked` = henüz keşfedilmemiş (sadece nadirlik çerçevesi görünür) */
+/** Ekranda olmayan kartın animasyonları durur (.is-idle): yatay şeridin dışındakiler ve sayfanın başka yerindeyken */
+const cardIO =
+  'IntersectionObserver' in window
+    ? new IntersectionObserver((es) => {
+        for (const e of es) {
+          // Yeniden çizimde DOM'dan çıkan kart: gözlemden çıkar (bellekte birikmesin)
+          if (!e.target.isConnected) cardIO?.unobserve(e.target);
+          else e.target.classList.toggle('is-idle', !e.isIntersecting);
+        }
+      }, { rootMargin: '80px' })
+    : null;
+
 export function renderCard(
   def: CardDef | null,
   rarity: Rarity,
@@ -173,6 +187,10 @@ export function renderCard(
   card.append(inner);
   if (rarity !== 'common') bindTilt(card, rarity === 'mythic' ? 16 : rarity === 'legendary' ? 14 : 10);
   else bindTilt(card, 0);
+  if (cardIO) {
+    card.classList.add('is-idle');
+    cardIO.observe(card);
+  }
   return card;
 }
 
@@ -294,7 +312,9 @@ function renderCollection(section: HTMLElement, opts: { preview?: boolean; sourc
       }
     };
     row.append(btn);
-    const msg = el('p', 'shop__msg', itemStatus.get(c.id) ?? (wearing ? `On your hamster's ${c.slot}` : 'Not worn'));
+    const resting = !wearing && !!src.itemResting?.(c.id);
+    if (resting) btn.disabled = true;
+    const msg = el('p', 'shop__msg', itemStatus.get(c.id) ?? (wearing ? `On your hamster's ${c.slot}` : resting ? 'Resting · out of energy for today' : 'Not worn'));
     slot.append(card, row, msg);
     grid.append(slot);
   }

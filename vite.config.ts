@@ -14,6 +14,10 @@ function siteUrl(url: string): Plugin {
 }
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), 'VITE_');
-  return { plugins: [siteUrl(env.VITE_SITE_URL ?? '')] };
+  const env = { ...loadEnv(mode, process.cwd(), 'VITE_'), ...Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('VITE_'))) } as Record<string, string>;
+  return {
+    plugins: [siteUrl(env.VITE_SITE_URL ?? '')],
+    // Yerel geliştirme: /api (claim fişi) yerel Worker'a gider (npm run worker:dev, ayarlar .dev.vars)
+    server: { proxy: { '/api': env.VITE_API_TARGET || 'http://127.0.0.1:8787' } },
+  };
 });

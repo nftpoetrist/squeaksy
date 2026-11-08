@@ -5,6 +5,7 @@ import { smoothScrollToEl } from '../page/smoothScroll';
 import { cardArt } from './art';
 import { CARDS, RARITIES, STARTER_HAMSTER, cardById, type CardDef } from './cards';
 import { renderCard, scroller } from './collection';
+import { mintButton, openMintDialog } from './mintUi';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -164,18 +165,42 @@ export function mountHamsterShop(
     });
   };
 
+  /** Hediyesi olan oyuncuya ilk girişte bir kez teşekkür penceresi */
+  const welcomeGift = () => {
+    const id = inv.giftCard;
+    const player = inv.playerId;
+    if (!id || !player || inv.isOwned(id)) return;
+    const key = `squeaksy.giftSeen.${player}`;
+    try {
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, '1');
+    } catch {
+      return;
+    }
+    const card = cardById(id);
+    if (card) openMintDialog(card, inv, true, true);
+  };
+
   /** Şeritte hangi tür önde: sağ üstteki Hamster / Pixsy düğmeleriyle değişir */
   let priority: 'hamster' | 'pixsy' = 'hamster';
 
   const render = () => {
     section.classList.add('collection');
+    // Onchain: Limited göstergesi Mint butonlarıyla aynı dilde (mint.css)
+    section.classList.toggle('collection--mint', inv.mintEnabled);
     section.replaceChildren();
     const panel = el('div', 'panel collection__panel collection__panel--brass');
     section.append(panel);
 
+    // Alınmamış early oyuncu hediyesi
+    const pendingGift = inv.giftCard && !inv.isOwned(inv.giftCard) ? inv.giftCard : null;
     // Satın alınmamışlar önde, sahip olunanlar sırada en sona (kendi içinde katalog sırası korunur)
     const forSaleFirst = (list: CardDef[]) =>
-      list.map((c, i) => ({ c, i })).sort((a, b) => Number(inv.isOwned(a.c.id)) - Number(inv.isOwned(b.c.id)) || a.i - b.i).map((x) => x.c);
+      list
+        .map((c, i) => ({ c, i }))
+        // Oyuncunun hediyesi en önde, sonra satın alınmamışlar
+        .sort((a, b) => Number(b.c.id === pendingGift) - Number(a.c.id === pendingGift) || Number(inv.isOwned(a.c.id)) - Number(inv.isOwned(b.c.id)) || a.i - b.i)
+        .map((x) => x.c);
     const hamsterList = forSaleFirst(CARDS.filter((x) => x.kind === 'Hamster'));
     const pixsyList = forSaleFirst(CARDS.filter((x) => x.kind === 'Item' && x.buddy));
 
@@ -183,7 +208,7 @@ export function mountHamsterShop(
     const titles = el('div');
     titles.append(
       el('h2', 'collection__title', 'Market'),
-      el('p', 'collection__sub', 'Spend your stars on new hamsters and Pixsy buddies'),
+      el('p', 'collection__sub', inv.mintEnabled ? 'Mint new hamsters and Pixsy buddies with the STARS in your wallet' : 'Spend your stars on new hamsters and Pixsy buddies'),
     );
 
     // Sağ üst: ürün türleri. Tıklanan tür şeritte öne geçer; sayılar o türdeki kart adedi
@@ -231,6 +256,16 @@ export function mountHamsterShop(
     const hamGroup: [CardDef[], () => HTMLElement] = [hamsterList, () => soon('Hamster · ???', 'Something is stirring in the hut. A new hamster is getting ready to run.')];
     const pixGroup: [CardDef[], () => HTMLElement] = [pixsyList, () => soon('Pixsy · ???', 'A new buddy is being drawn pixel by pixel. Stay tuned.')];
     const groups = priority === 'hamster' ? [hamGroup, pixGroup] : [pixGroup, hamGroup];
+    // Alınmamış hediye şeridin en solunda (türü ne olursa olsun)
+    if (pendingGift) {
+      const g = groups.find(([list]) => list.some((c) => c.id === pendingGift));
+      const giftCard = g?.[0].find((c) => c.id === pendingGift);
+      if (g && giftCard) {
+        const rest = g[0].filter((c) => c.id !== pendingGift);
+        groups[groups.indexOf(g)] = [rest, g[1]];
+        groups[0] = [[giftCard, ...groups[0][0]], groups[0][1]];
+      }
+    }
     const target = grid;
     for (const [list, teaser] of groups) {
     for (const c of list) {
@@ -245,7 +280,47 @@ export function mountHamsterShop(
 
       const row = el('div', `shop__row shop__row--${c.rarity}`);
       const price = c.price ?? 0;
-      if (owned) {
+      if (inv.mintEnabled) {
+        // Onchain: kartlar cüzdandaki STARS ile mint edilir (Claim butonu tarzında). Soulbound: satış yok.
+        if (owned) {
+          row.dataset.need = c.chainType ? 'Soulbound in your wallet · in your collection' : 'In your collection';
+        } else {
+          row.classList.add('shop__row--buy');
+          const have = inv.walletStars;
+          const soldOut = inv.supplyLeft(c.id) === 0;
+          const isGift = inv.giftCard === c.id;
+          let need = '';
+          let ready = false;
+          let onClick = () => openMintDialog(c, inv, isGift);
+          if (soldOut) need = 'Every one has an owner.';
+          else if (isGift) {
+            // Early oyuncu hediyesi: STARS ve claim gerekmez; buton hep parlak. Cüzdan yoksa pencere önce "Connect wallet" der,
+            // bağlanınca kendiliğinden "Claim gift" ile geri açılır.
+            ready = true;
+            need = inv.walletConnected ? 'Your early player gift · free' : 'Your early player gift · connect your wallet';
+          }
+          else if (!inv.signedIn) {
+            need = 'Sign in to mint';
+            onClick = () => signIn();
+          } else if (!inv.walletConnected) {
+            need = 'Connect your wallet to mint';
+            onClick = () => inv.openWallet();
+          } else if (have !== null && !inv.linkedWallet) need = 'Claim your stars to your wallet first';
+          else if (have !== null && have < price) need = `Need ${fmt.format(price - have)} more STARS in your wallet`;
+          else ready = have !== null;
+          const { wrap, btn } = soldOut
+            ? mintButton('Sold out', null, { ready: false, disabled: true })
+            : isGift
+              ? mintButton('Gift', 'Free', { ready, dim: !ready })
+              : mintButton('Mint', price, { ready, dim: !ready });
+          btn.title = soldOut ? 'Sold out' : isGift ? `Claim your free ${c.name}` : `Mint ${c.name} for ${fmt.format(price)} STARS`;
+          btn.onclick = () => {
+            if (!inv.busy) onClick();
+          };
+          if (need && !status.has(c.id)) row.dataset.need = need;
+          row.append(wrap);
+        }
+      } else if (owned) {
         // Market sadece alım-satım yeri: kuşanma (Put on / Wearing / Running) My Collection'da ve oyunda.
         // Satın alınmış kartın altında sadece Limited sayacı + Sell (başlangıç kartları satılmaz).
         row.dataset.need = 'In your collection';
@@ -301,7 +376,25 @@ export function mountHamsterShop(
     }
     grid.append(teaser());
     }
-    panel.append(head, hint, scroller(grid));
+    panel.append(head);
+    // Hediye bandı: alınmamış hediye varsa Market'in en üstünde
+    if (pendingGift) {
+      const card = cardById(pendingGift);
+      const bar = el('div', 'mint__giftbar');
+      const text = el('p', 'mint__giftbar-text');
+      text.append(el('b', '', 'Early player gift'), document.createTextNode(` A free ${card?.name ?? 'card'} is waiting for you. Thank you for being here from the start.`));
+      const go = el('button', 'px-btn px-btn--ok', 'See my gift');
+      go.type = 'button';
+      go.onclick = () => {
+        priority = card?.kind === 'Item' ? 'pixsy' : 'hamster';
+        render();
+        focus(pendingGift);
+      };
+      bar.append(text, go);
+      panel.append(bar);
+    }
+    panel.append(hint, scroller(grid));
+    welcomeGift();
   };
 
   inv.onChange(render);
@@ -329,7 +422,7 @@ export function mountHamsterShop(
     slot.classList.remove('is-focus');
     void slot.offsetWidth;
     slot.classList.add('is-focus');
-    window.setTimeout(() => slot.querySelector<HTMLButtonElement>('.shop__buy, .shop__btn')?.focus({ preventScroll: true }), 600);
+    window.setTimeout(() => slot.querySelector<HTMLButtonElement>('.shop__buy, .shop__btn, .mint__btn')?.focus({ preventScroll: true }), 600);
   };
   return { focus };
 }

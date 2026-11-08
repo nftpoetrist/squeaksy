@@ -110,5 +110,7 @@ export function mountSoundToggle(stage: HTMLElement, hud: HTMLElement, audio: Au
   };
   new ResizeObserver(place).observe(hud);
   window.addEventListener('resize', place);
+  // Sayaç yer değiştirdi (ör. yanına Claim butonu geldi): boyutu değişmese de yeniden hizala
+  window.addEventListener('squeaksy:hud', place);
   place();
 }
